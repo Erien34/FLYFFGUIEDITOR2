@@ -30,7 +30,6 @@ public:
     // ------------------------------
     void refreshFromFiles(const QString& wndPath, const QString& ctrlPath);
     void refreshFromParser();
-    void rebuildFromTokens(const QMap<QString, QList<Token>>& tokens);
 
     // ------------------------------
     // 🔹 Layout-Verarbeitung
@@ -52,7 +51,6 @@ public:
     // ------------------------------
     // 🔹 Regeln & Flag-Gruppen
     // ------------------------------
-    void loadFlagRules();
     QJsonObject getWindowFlagRules() const;
     QJsonObject getControlFlagRules() const;
 
@@ -105,18 +103,21 @@ private:
     // Regeln (aus window_flag_rules.json / control_flag_rules.json)
     mutable QJsonObject m_windowRules;
     mutable QJsonObject m_controlRules;
+    mutable bool m_windowRulesLoaded = false;
+    mutable bool m_controlRulesLoaded = false;
     QMap<QString, QSet<QString>> m_validFlagsByType;
 
     // Analyse
     QMap<QString, QSet<QString>> m_controlTypeProperties;
 
     // 🆕 Gesammelte unbekannte Bits pro Control-Typ
-    QMap<QString, QMap<QString, QString>> m_unknownControlBits;
+    QMap<QString, QMap<QString, QSet<QString>>> m_unknownControlBits;
 
     // ------------------------------
     // 🔹 Hilfsfunktionen
     // ------------------------------
     QString unquote(const QString& s) const;
-    void normalizeWindowFlags();   // (optional: deprecated, falls über Backend erledigt)
-    void normalizeControlFlags();  // (optional: deprecated)
+    void reloadWindowFlagRules();
+    void reloadControlFlagRules();
+    void rebuildValidFlagCache();
 };

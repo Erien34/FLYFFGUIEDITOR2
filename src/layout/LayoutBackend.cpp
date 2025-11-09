@@ -63,6 +63,27 @@ bool LayoutBackend::saveWindowFlagRules(const QJsonObject& json)
     return saveWindowFlagRules(m_fileManager->windowFlagRulesPath(), json);
 }
 
+QJsonObject LayoutBackend::loadWindowFlagRules()
+{
+    if (!m_fileManager)
+    {
+        qWarning() << "[LayoutBackend] Kein FileManager gesetzt für loadWindowFlagRules()";
+        return {};
+    }
+    return loadWindowFlagRules(m_fileManager->windowFlagRulesPath());
+}
+
+QJsonObject LayoutBackend::loadControlFlagRules()
+{
+    if (!m_fileManager)
+    {
+        qWarning() << "[LayoutBackend] Kein FileManager gesetzt für loadControlFlagRules()";
+        return {};
+    }
+    return loadControlFlagRules(m_fileManager->controlFlagRulesPath());
+}
+
+
 bool LayoutBackend::saveControlFlagRules(const QJsonObject& json)
 {
     if (!m_fileManager)
@@ -147,7 +168,28 @@ bool LayoutBackend::saveUndefinedControlFlags(const QString& path, const QJsonOb
 // =============================================================
 bool LayoutBackend::load()
 {
-    // Optionaler Sammelladevorgang, falls du später Flags/Types etc. auf einmal laden willst
+    if (m_path.isEmpty()) {
+        qWarning() << "[LayoutBackend] Kein Layout-Pfad gesetzt – setPath() vorher aufrufen!";
+        return false;
+    }
+
+    QFileInfo fi(m_path);
+    if (!fi.exists()) {
+        qWarning() << "[LayoutBackend] Layout-Datei existiert nicht:" << m_path;
+        return false;
+    }
+
+    qInfo() << "[LayoutBackend] Lade Layout-Datei:" << m_path;
+
+    // 🔹 Hier startet wirklich das Parsen
+    bool ok = m_parser.parse(m_path);
+
+    if (!ok) {
+        qWarning() << "[LayoutBackend] LayoutParser konnte Datei nicht verarbeiten:" << m_path;
+        return false;
+    }
+
+    qInfo() << "[LayoutBackend] Layout-Datei erfolgreich geladen und Tokens erzeugt.";
     return true;
 }
 

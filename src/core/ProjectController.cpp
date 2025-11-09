@@ -29,7 +29,7 @@ ProjectController::ProjectController(QObject* parent)
     m_configManager(std::make_unique<ConfigManager>()),
     m_fileManager(std::make_unique<FileManager>(m_configManager.get())),
     m_layoutParser(std::make_unique<LayoutParser>()),
-    m_layoutBackend(std::make_unique<LayoutBackend>(*m_layoutParser)),
+    m_layoutBackend(std::make_unique<LayoutBackend>(*m_fileManager, *m_layoutParser )),
     m_defineManager(std::make_unique<DefineManager>()),
     m_defineBackend(std::make_unique<DefineBackend>()),
     m_flagManager(std::make_unique<FlagManager>(m_configManager.get())),
@@ -58,9 +58,11 @@ void ProjectController::onTokensReady()
     for (const auto& list : tokenMap)
         flatTokens.append(list);
 
-    // 3) LayoutManager erwartet die MAP → direkt geben
-    if (m_layoutManager)
-        m_layoutManager->rebuildFromTokens(tokenMap);
+    // 3) LayoutManager übernimmt Tokens direkt aus dem Singleton
+    {
+        m_layoutManager->refreshFromParser();
+        m_layoutManager->processLayout();
+    }
 
     // 4) DefineManager erwartet LISTE → flache Liste geben
     if (m_defineManager)
@@ -188,18 +190,6 @@ bool ProjectController::loadProject(const QString& configPath)
     m_themes = ResourceUtils::loadPixmaps(themeDir);
     qDebug().noquote() << "[Themes geladen] Keys:" << m_themes.keys();
 
-    // -----------------------------------------
-    // 8️⃣ Flag-Rules laden (neu, getrennte Dateien)
-    // -----------------------------------------
-    const QString wndRulesPath  = m_fileManager->windowFlagRulesPath();
-    const QString ctrlRulesPath = m_fileManager->controlFlagRulesPath();
-
-    qInfo().noquote() << "[ProjectController] Lade getrennte Flag-Regeldateien:"
-                      << "\n  🪟 Fenster-Regeln: " << wndRulesPath
-                      << "\n  🎛️ Control-Regeln: " << ctrlRulesPath;
-
-    // LayoutManager kümmert sich selbst um Laden / Erstellen
-    m_layoutManager->loadFlagRules();
     // -----------------------------------------
     // 🔒 Abschluss-Check: Tokens schon da?
     // -----------------------------------------

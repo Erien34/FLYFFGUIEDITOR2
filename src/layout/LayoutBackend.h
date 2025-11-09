@@ -28,6 +28,8 @@ public:
     QJsonObject loadWindowFlags();
     QJsonObject loadControlFlags();
     QJsonObject loadWindowTypes();
+    QJsonObject loadWindowFlagRules();
+    QJsonObject loadControlFlagRules();
 
     // Regeldateien speichern (Manager liefert JSON)
     bool saveWindowFlagRules(const QJsonObject& json);

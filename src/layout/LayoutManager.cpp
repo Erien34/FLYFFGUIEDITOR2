@@ -46,6 +46,10 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
     m_windowFlags.clear();
     m_controlFlags.clear();
     m_windowTypes.clear();
+    m_windowRules = QJsonObject{};
+    m_controlRules = QJsonObject{};
+    m_windowRulesLoaded = false;
+    m_controlRulesLoaded = false;
 
     // ----------------------------------------------------
     // 🪟 Window Flags (werden links-shifted)
@@ -67,7 +71,7 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
     }
 
     // ----------------------------------------------------
-    // 🎛️ Control Flags (ebenfalls links-shifted)
+    // Control Flags (ebenfalls links-shifted)
     // ----------------------------------------------------
     for (auto it = ctrlObj.constBegin(); it != ctrlObj.constEnd(); ++it)
     {
@@ -219,6 +223,10 @@ void LayoutManager::processLayout()
         }
     }
 
+    analyzeControlTypes();
+    generateUnknownControls();
+    rebuildValidFlagCache();
+
     qInfo() << "[LayoutManager] Validierung abgeschlossen.";
 }
 
@@ -319,7 +327,29 @@ void LayoutManager::analyzeControlTypes()
                .arg(m_controlTypeProperties.size());
 }
 
+bool LayoutManager::allowsPropertyForType(const QString& type, const QString& property) const
+{
+    if (type.isEmpty() || property.isEmpty())
+        return false;
 
+    if (m_controlTypeProperties.isEmpty())
+        const_cast<LayoutManager*>(this)->analyzeControlTypes();
+
+    const auto it = m_controlTypeProperties.constFind(type);
+    if (it == m_controlTypeProperties.constEnd())
+        return false;
+
+    if (it.value().contains(property))
+        return true;
+
+    // Fallback auf Groß-/Kleinschreibung ignorierend
+    for (const QString& prop : it.value())
+    {
+        if (prop.compare(property, Qt::CaseInsensitive) == 0)
+            return true;
+    }
+    return false;
+}
 // -------------------------------------------------------------
 // Generate Default Window Flag Rules
 // -------------------------------------------------------------
@@ -433,4 +463,199 @@ QString LayoutManager::serializeLayout() const
         out += "}\r\n\r\n";
     }
     return out;
+}
+
+
+QJsonObject LayoutManager::getWindowFlagRules() const
+{
+    if (!m_windowRulesLoaded)
+        const_cast<LayoutManager*>(this)->reloadWindowFlagRules();
+    return m_windowRules;
+}
+
+QJsonObject LayoutManager::getControlFlagRules() const
+{
+    if (!m_controlRulesLoaded)
+        const_cast<LayoutManager*>(this)->reloadControlFlagRules();
+    return m_controlRules;
+}
+
+QSet<QString> LayoutManager::allowedWindowFlags(const QString& typeName) const
+{
+    if (m_validFlagsByType.isEmpty())
+        const_cast<LayoutManager*>(this)->rebuildValidFlagCache();
+
+    if (m_validFlagsByType.isEmpty())
+        return {};
+
+    const QString directKey = QStringLiteral("window:%1").arg(typeName);
+    const QString defaultKey = QStringLiteral("window:Default");
+
+    if (m_validFlagsByType.contains(directKey))
+        return m_validFlagsByType.value(directKey);
+
+    return m_validFlagsByType.value(defaultKey);
+}
+
+QSet<QString> LayoutManager::allowedControlFlags(const QString& typeName) const
+{
+    if (m_validFlagsByType.isEmpty())
+        const_cast<LayoutManager*>(this)->rebuildValidFlagCache();
+
+    if (m_validFlagsByType.isEmpty())
+        return {};
+
+    const QString directKey = QStringLiteral("control:%1").arg(typeName);
+    const QString defaultKey = QStringLiteral("control:Default");
+
+    if (m_validFlagsByType.contains(directKey))
+        return m_validFlagsByType.value(directKey);
+
+    return m_validFlagsByType.value(defaultKey);
+}
+
+void LayoutManager::updateWindowFlags(const std::shared_ptr<WindowData>& wnd)
+{
+    if (!wnd)
+        return;
+
+    validateWindowFlags(wnd.get());
+}
+
+void LayoutManager::updateControlFlags(const std::shared_ptr<ControlData>& ctrl)
+{
+    if (!ctrl)
+        return;
+
+    validateControlFlags(ctrl.get());
+    generateUnknownControls();
+}
+
+std::shared_ptr<WindowData> LayoutManager::findWindow(const QString& name) const
+{
+    for (const auto& wnd : m_windows)
+    {
+        if (wnd && wnd->name.compare(name, Qt::CaseInsensitive) == 0)
+            return wnd;
+    }
+    return nullptr;
+}
+
+void LayoutManager::generateUnknownControls()
+{
+    m_unknownControlBits.clear();
+
+    if (m_windows.empty() || m_controlFlags.isEmpty())
+    {
+        m_backend.saveUndefinedControlFlags(QJsonObject{});
+        return;
+    }
+
+    quint32 knownBits = 0;
+    for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
+        knownBits |= it.value();
+
+    for (const auto& wnd : m_windows)
+    {
+        if (!wnd)
+            continue;
+
+        for (const auto& ctrl : wnd->controls)
+        {
+            if (!ctrl)
+                continue;
+
+            const quint32 unknownMask = ctrl->flagsMask & ~knownBits;
+            if (unknownMask == 0u)
+                continue;
+
+            const QString maskHex = QStringLiteral("0x%1").arg(unknownMask, 0, 16).toUpper();
+            QString identifier = ctrl->id;
+            if (identifier.isEmpty())
+                identifier = ctrl->rawHeader.trimmed();
+            if (identifier.isEmpty())
+                identifier = QStringLiteral("[%1/%2]").arg(wnd->name).arg(ctrl->type);
+
+            m_unknownControlBits[ctrl->type][maskHex].insert(identifier);
+        }
+    }
+
+    if (m_unknownControlBits.isEmpty())
+    {
+        m_backend.saveUndefinedControlFlags(QJsonObject{});
+        return;
+    }
+
+    QJsonObject root;
+    for (auto typeIt = m_unknownControlBits.cbegin(); typeIt != m_unknownControlBits.cend(); ++typeIt)
+    {
+        QJsonArray entries;
+        for (auto maskIt = typeIt.value().cbegin(); maskIt != typeIt.value().cend(); ++maskIt)
+        {
+            QJsonObject entry;
+            entry.insert("mask", maskIt.key());
+            QJsonArray controls;
+            for (const auto& id : maskIt.value())
+                controls.append(id);
+            entry.insert("controls", controls);
+            entries.append(entry);
+        }
+        root.insert(typeIt.key(), entries);
+    }
+
+    if (!m_backend.saveUndefinedControlFlags(root))
+    {
+        qWarning().noquote() << "[LayoutManager] Konnte undefined_control_flags.json nicht aktualisieren.";
+    }
+}
+
+void LayoutManager::reloadWindowFlagRules()
+{
+    m_windowRules = m_backend.loadWindowFlagRules();
+    m_windowRulesLoaded = true;
+
+    if (m_windowRules.isEmpty())
+    {
+        qInfo() << "[LayoutManager] Keine window_flag_rules gefunden – erstelle Defaults.";
+        generateDefaultWindowFlagRules();
+        m_windowRules = m_backend.loadWindowFlagRules();
+    }
+}
+
+void LayoutManager::reloadControlFlagRules()
+{
+    m_controlRules = m_backend.loadControlFlagRules();
+    m_controlRulesLoaded = true;
+
+    if (m_controlRules.isEmpty())
+    {
+        qInfo() << "[LayoutManager] Keine control_flag_rules gefunden – erstelle Defaults.";
+        generateDefaultControlFlagRules();
+        m_controlRules = m_backend.loadControlFlagRules();
+    }
+}
+
+void LayoutManager::rebuildValidFlagCache()
+{
+    m_validFlagsByType.clear();
+
+    const auto addRules = [this](const QJsonObject& rules, const QString& prefix) {
+        for (auto it = rules.constBegin(); it != rules.constEnd(); ++it)
+        {
+            const QJsonObject obj = it.value().toObject();
+            const QJsonArray valid = obj.value("valid").toArray();
+            if (valid.isEmpty())
+                continue;
+
+            QSet<QString> entries;
+            for (const auto& v : valid)
+                entries.insert(v.toString());
+
+            if (!entries.isEmpty())
+                m_validFlagsByType.insert(prefix + it.key(), entries);
+        }
+    };
+
+    addRules(getWindowFlagRules(), QStringLiteral("window:"));
+    addRules(getControlFlagRules(), QStringLiteral("control:"));
 }
