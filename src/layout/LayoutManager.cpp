@@ -357,36 +357,110 @@ void LayoutManager::generateDefaultWindowFlagRules()
 {
     QJsonObject root;
     QJsonObject defaults;
-    QJsonArray valid = {
-        "WBS_NOFOCUS", "WBS_CAPTION", "WBS_NOCLING", "WBS_CHILDFRAME",
-        "WBS_MOVE", "WBS_POPUP", "WBS_MANAGER", "WBS_VSCROLL", "WBS_HSCROLL",
-        "WBS_SOUND", "WBS_CHILD", "WBS_DROPICON", "WBS_MODAL",
-        "WBS_NODRAWFRAME", "WBS_KEY", "WBS_DOCKING", "WBS_NOFRAME", "WBS_TOPMOST"
-    };
+    QJsonArray valid;
+
+    // 🔹 Alle bekannten Window-Flags automatisch aus m_windowFlags übernehmen
+    for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
+    {
+        const QString& flagName = it.key();
+        if (flagName.startsWith("WBS_")) // nur echte Window-Flags
+            valid.append(flagName);
+    }
+
     defaults["valid"] = valid;
+
+    // 🔹 Optional: sinnvolle Exklusivregeln (z. B. Rahmen oder Orientierung)
+    QJsonObject exclusive;
+
+    auto addExclusive = [&exclusive](const QString &a, const QStringList &others) {
+        QJsonArray arr;
+        for (const QString &o : others)
+            arr.append(o);
+        exclusive.insert(a, arr);
+    };
+
+    if (m_windowFlags.contains("WBS_NOFRAME") && m_windowFlags.contains("WBS_THICKFRAME"))
+    {
+        addExclusive("WBS_NOFRAME",   {"WBS_THICKFRAME"});
+        addExclusive("WBS_THICKFRAME",{"WBS_NOFRAME"});
+    }
+
+    if (m_windowFlags.contains("WBS_HORI") && m_windowFlags.contains("WBS_VERT"))
+    {
+        addExclusive("WBS_HORI", {"WBS_VERT"});
+        addExclusive("WBS_VERT", {"WBS_HORI"});
+    }
+
+    if (!exclusive.isEmpty())
+        defaults["exclusive"] = exclusive;
+
+    // 🔹 Root-Objekt zusammenbauen
     root["Default"] = defaults;
 
-    // Der Backend kennt den Speicherort selbst
+    // 🔹 Speichern über Backend
     m_backend.saveWindowFlagRules(root);
 
-    qInfo() << "[LayoutManager] Default window_flag_rules.json generiert.";
+    qInfo() << "[LayoutManager] Default window_flag_rules.json generiert ("
+            << valid.size() << " Flags eingetragen ).";
 }
-
 // -------------------------------------------------------------
 // Generate Default Control Flag Rules
 // -------------------------------------------------------------
 void LayoutManager::generateDefaultControlFlagRules()
 {
     QJsonObject root;
-    root["Default"] = QJsonObject{
-        {"valid", QJsonArray{"EBS_LEFT", "EBS_CENTER", "EBS_RIGHT"}},
-        {"exclusive", QJsonObject{{"EBS_LEFT", QJsonArray{"EBS_CENTER", "EBS_RIGHT"}}}}
+    QJsonObject defaults;
+    QJsonArray valid;
+
+    // 🔹 Alle bekannten Control-Flags aus m_controlFlags übernehmen
+    // (m_controlFlags wird aus control_flags.json geladen)
+    for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
+    {
+        const QString& flagName = it.key();
+        if (flagName.startsWith("CBS_") ||
+            flagName.startsWith("EBS_") ||
+            flagName.startsWith("BS_")  ||
+            flagName.startsWith("WLVS_"))
+        {
+            valid.append(flagName);
+        }
+    }
+
+    defaults["valid"] = valid;
+
+    // 🔹 Optionale Exklusivgruppen (z. B. Textausrichtung)
+    QJsonObject exclusive;
+
+    auto addExclusive = [&exclusive](const QString& a, const QStringList& others)
+    {
+        QJsonArray arr;
+        for (const QString& o : others)
+            arr.append(o);
+        exclusive.insert(a, arr);
     };
 
+    if (m_controlFlags.contains("EBS_LEFT") &&
+        m_controlFlags.contains("EBS_CENTER") &&
+        m_controlFlags.contains("EBS_RIGHT"))
+    {
+        addExclusive("EBS_LEFT",   {"EBS_CENTER", "EBS_RIGHT"});
+        addExclusive("EBS_CENTER", {"EBS_LEFT",   "EBS_RIGHT"});
+        addExclusive("EBS_RIGHT",  {"EBS_LEFT",   "EBS_CENTER"});
+    }
+
+    if (!exclusive.isEmpty())
+        defaults["exclusive"] = exclusive;
+
+    // 🔹 Root-Objekt zusammensetzen
+    root["Default"] = defaults;
+
+    // 🔹 Speichern über deinen Backend
     m_backend.saveControlFlagRules(root);
 
-    qInfo() << "[LayoutManager] Default control_flag_rules.json generiert.";
+    qInfo() << "[LayoutManager] Default control_flag_rules.json generiert ("
+            << valid.size() << " Flags eingetragen ).";
 }
+
 
 // -------------------------------------------------------------
 // Serialize Layout (unverändert, nicht kürzen!)
