@@ -1,0 +1,43 @@
+# ---- Qt & C++ Build Files ----
+build*/
+*.user
+*.pro.user
+*.qbs.user
+*.qmlc
+*.jsc
+*.obj
+*.o
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+
+# ---- CMake ----
+CMakeFiles/
+CMakeCache.txt
+*.cmake
+Makefile
+
+# ---- Qt Creator ----
+*.creator.*
+*.autosave
+
+# ---- Logs & temporäre Dateien ----
+*.log
+*.tmp
+*.zip
+*.7z
+*.rar
+
+# ---- Visual Studio (falls du es benutzt) ----
+*.vcxproj*
+*.sln
+*.ncb
+*.suo
+*.opensdf
+*.vcxproj.user
+
+# ---- Eigene Ordner ausschließen ----
+/TEST/
