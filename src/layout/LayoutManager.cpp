@@ -63,7 +63,7 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
         bool ok = false;
         quint32 raw = val.toUInt(&ok, 16);
         if (ok)
-            m_windowFlags[it.key()] = (raw << 16);
+            m_windowFlags[it.key()] = raw;
         else
             qWarning().noquote()
                 << "[LayoutManager] Ungültiger Window-Flag-Wert:"
@@ -128,6 +128,9 @@ void LayoutManager::refreshFromParser()
     {
         const QList<Token>& tokens = it.value();
         if (tokens.isEmpty())
+            continue;
+
+        if (it.key().trimmed().isEmpty())
             continue;
 
         auto win = std::make_shared<WindowData>();
@@ -460,7 +463,6 @@ void LayoutManager::generateDefaultControlFlagRules()
     qInfo() << "[LayoutManager] Default control_flag_rules.json generiert ("
             << valid.size() << " Flags eingetragen ).";
 }
-
 
 // -------------------------------------------------------------
 // Serialize Layout (unverändert, nicht kürzen!)
