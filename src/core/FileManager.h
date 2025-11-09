@@ -10,10 +10,12 @@ class FileManager
 public:
     explicit FileManager(ConfigManager* cfg = nullptr) : m_config(cfg) {}
     void setConfig(ConfigManager* cfg) { m_config = cfg; }
+    void cacheLayoutPath(const QString& path);
 
     QString layoutPath() const;
     QString definePath() const;
     QString textPath() const;
+    QString textIncPath() const;
 
     QString themePath() const { return m_config ? m_config->themePath() : QString(); }
     QString iconPath()  const { return m_config ? m_config->iconPath()  : QString(); }
@@ -45,4 +47,5 @@ private:
     QString m_layoutPath;
     mutable QString m_definePath;
     mutable QString m_textPath;
+    mutable QString m_textIncPath;
 };

@@ -124,6 +124,7 @@ bool ProjectController::loadProject(const QString& configPath)
     }
 
     const QString resdataFile = m_configManager->layoutPath();
+    m_fileManager->cacheLayoutPath(resdataFile);
     const QString themeDir    = m_configManager->themePath();
     const QString iconDir     = m_configManager->iconPath();
     const QString sourceDir   = m_configManager->sourcePath();
@@ -235,6 +236,11 @@ bool ProjectController::saveProject()
         return false;
     }
 
+    if (!m_textManager || !m_textBackend) {
+        qWarning() << "[ProjectController] Text-Komponenten fehlen!";
+        return false;
+    }
+
     QString layoutPath = m_fileManager->layoutPath();
     if (layoutPath.isEmpty()) {
         qWarning() << "[ProjectController] Kein Layout-Pfad gesetzt!";
@@ -265,13 +271,49 @@ bool ProjectController::saveProject()
     }
 
     // ----------------------------------------------------------
+    // 3️⃣ Texte speichern (nur wenn Dirty)
+    // ----------------------------------------------------------
+    QString textPath;
+    QString textIncPath;
+    if (m_textManager->isDirty()) {
+        textPath = m_fileManager->textPath();
+        if (textPath.isEmpty()) {
+            qWarning() << "[ProjectController] Kein Text-Pfad gefunden!";
+            return false;
+        }
+
+        textIncPath = m_fileManager->textIncPath();
+        if (textIncPath.isEmpty()) {
+            qWarning() << "[ProjectController] Kein Text-INC-Pfad gefunden!";
+            return false;
+        }
+
+        if (!m_textBackend->saveText(textPath, *m_textManager)) {
+            qWarning() << "[ProjectController] Textdatei speichern fehlgeschlagen!";
+            return false;
+        }
+
+        if (!m_textBackend->saveInc(textIncPath, *m_textManager)) {
+            qWarning() << "[ProjectController] Text-INC-Datei speichern fehlgeschlagen!";
+            return false;
+        }
+
+        m_textManager->clearDirty();
+    } else {
+        textPath    = m_fileManager->textPath();
+        textIncPath = m_fileManager->textIncPath();
+    }
+
+    // ----------------------------------------------------------
     // Fertig!
     // ----------------------------------------------------------
     emit projectSaved();
     qInfo().noquote()
         << "[ProjectController] Projekt erfolgreich gespeichert:"
         << "\n   Layout :" << layoutPath
-        << "\n   Defines:" << definePath;
+        << "\n   Defines:" << definePath
+        << "\n   Texte  :" << (textPath.isEmpty() ? QStringLiteral("<unbekannt>") : textPath)
+        << "\n   Text-INC:" << (textIncPath.isEmpty() ? QStringLiteral("<unbekannt>") : textIncPath);
 
     return true;
 }

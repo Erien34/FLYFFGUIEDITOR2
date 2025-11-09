@@ -111,8 +111,11 @@ void FlagManager::parseHeaderFile(const QString& filePath)
         if (tokens.size() < 3)
             continue;
 
-        QString key = tokens[1];
-        QString value = tokens[2];
+        QString key   = tokens[1];
+        QString value = tokens[2].trimmed();
+
+        // 🔹 Entferne Endungen wie "L", "UL", "U"
+        value.remove(QRegularExpression("[lLuU]+$"));
 
         // 🔹 Zahlenwert in Hex normalisieren
         if (!value.startsWith("0x", Qt::CaseInsensitive)) {
@@ -130,33 +133,14 @@ void FlagManager::parseHeaderFile(const QString& filePath)
             value = value.toUpper();
         }
 
-        // 🔸 Gruppierung (nur WindowBase + Control-Gruppen)
-        if (key.startsWith("WBS_")) {
-            // Window Base Style Flags → WindowFlags
-            m_windowFlags.insert(key, value);
-        }
-        else if (key.startsWith("BS_")) {
-            m_controlFlags.insert(key, value);
-        }
-        else if (key.startsWith("EBS_")) {
-            m_controlFlags.insert(key, value);
-        }
-        else if (key.startsWith("TCS_")) {
-            m_controlFlags.insert(key, value);
-        }
-        else if (key.startsWith("WLVS_")) {
-            m_controlFlags.insert(key, value);
-        }
-        else if (key.startsWith("SS_")) {
-            m_controlFlags.insert(key, value);
-        }
-        else if (key.startsWith("WTYPE_")) {
-            m_windowTypes.insert(key, value);
-        }
-        else {
-            // Alles andere wird ignoriert
-            continue;
-        }
+        // 🔸 Gruppierung
+        if      (key.startsWith("WBS_"))   m_windowFlags.insert(key, value);
+        else if (key.startsWith("BS_"))    m_controlFlags.insert(key, value);
+        else if (key.startsWith("EBS_"))   m_controlFlags.insert(key, value);
+        else if (key.startsWith("TCS_"))   m_controlFlags.insert(key, value);
+        else if (key.startsWith("WLVS_"))  m_controlFlags.insert(key, value);
+        else if (key.startsWith("SS_"))    m_controlFlags.insert(key, value);
+        else if (key.startsWith("WTYPE_")) m_windowTypes.insert(key, value);
     }
 }
 // ============================================================================

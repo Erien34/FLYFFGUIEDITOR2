@@ -11,7 +11,13 @@ bool nameEqualsIgnoreCase(const QString& fileName, const QString& target) {
     return fileName.compare(target, Qt::CaseInsensitive) == 0;
 }
 }
-
+void FileManager::cacheLayoutPath(const QString& path)
+{
+    m_layoutPath    = path;
+    m_definePath.clear();
+    m_textPath.clear();
+    m_textIncPath.clear();
+}
 // ------------------------------------------------------
 // Suche NUR nach textclient.inc (bzw. ähnliche Dateien)
 // ------------------------------------------------------
@@ -32,6 +38,7 @@ QString FileManager::findTextIncFile(const QString& layoutFile) const
         for (const auto& name : candidates) {
             if (nameEqualsIgnoreCase(fi.fileName(), name)) {
                 qInfo() << "[FileManager] textClient.inc gefunden:" << fi.absoluteFilePath();
+                m_textIncPath = fi.absoluteFilePath();
                 return fi.absoluteFilePath();
             }
         }
@@ -68,6 +75,7 @@ QString FileManager::findTextFile(const QString& layoutFile) const
         for (const auto& name : candidates) {
             if (nameEqualsIgnoreCase(fi.fileName(), name)) {
                 qInfo() << "[FileManager] Text-Datei gefunden:" << fi.absoluteFilePath();
+                m_textPath = fi.absoluteFilePath();
                 return fi.absoluteFilePath();
             }
         }
@@ -138,6 +146,26 @@ QString FileManager::textPath() const
     return m_textPath;
 }
 
+QString FileManager::textIncPath() const
+{
+    if (!m_textIncPath.isEmpty())
+        return m_textIncPath;
+
+    QString layoutPath = m_layoutPath;
+    if (layoutPath.isEmpty() && m_config)
+        layoutPath = m_config->layoutPath();
+
+    if (layoutPath.isEmpty()) {
+        qWarning().noquote() << "[FileManager] Kein Layout-Pfad in Config oder Member!";
+        return {};
+    }
+
+    QString path = findTextIncFile(layoutPath);
+    if (!path.isEmpty())
+        m_textIncPath = path;
+
+    return m_textIncPath;
+}
 
 QString FileManager::definePath() const
 {
