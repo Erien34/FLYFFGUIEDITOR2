@@ -4,6 +4,7 @@
 #include "defines/DefineBackend.h"
 #include "defines/DefineManager.h"
 #include "defines/FlagManager.h"
+#include "defines/BehaviorManager.h"
 #include "texts/TextBackend.h"
 #include "texts/TextManager.h"
 #include "layout/LayoutParser.h"
@@ -13,6 +14,7 @@
 #include "editor/CanvasHandler.h"
 #include "ui/WindowPanel.h"
 #include "ui/PropertyPanel.h"
+
 
 #include <QFileDialog>
 #include <QFileInfo>
@@ -35,7 +37,12 @@ ProjectController::ProjectController(QObject* parent)
     m_flagManager(std::make_unique<FlagManager>(m_configManager.get())),
     m_textManager(std::make_unique<TextManager>()),
     m_textBackend(std::make_unique<TextBackend>()),
-    m_layoutManager(std::make_unique<LayoutManager>(*m_layoutParser, *m_layoutBackend))
+    m_layoutManager(std::make_unique<LayoutManager>(*m_layoutParser, *m_layoutBackend)),
+    m_behaviorManager(std::make_unique<BehaviorManager>(
+        m_flagManager.get(),
+        m_textManager.get(),
+        m_defineManager.get(),
+        m_layoutManager.get()))
 
 
 {
@@ -62,6 +69,17 @@ void ProjectController::onTokensReady()
     {
         m_layoutManager->refreshFromParser();
         m_layoutManager->processLayout();
+    }
+
+    if (m_behaviorManager) {
+        auto processedWindows = m_layoutManager->processedWindows();
+        for (auto& wnd : processedWindows) {
+            if (!wnd) continue;
+            for (auto& ctrl : wnd->controls) {
+                if (ctrl)
+                    m_behaviorManager->applyBehavior(*ctrl);
+            }
+        }
     }
 
     // 4) DefineManager erwartet LISTE → flache Liste geben

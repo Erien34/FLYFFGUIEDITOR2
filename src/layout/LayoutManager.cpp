@@ -136,8 +136,17 @@ void LayoutManager::refreshFromParser()
         auto win = std::make_shared<WindowData>();
         win->name = it.key();
 
+
         int i = 0;
 
+        if (win->flagsMask == 0x164)
+        {
+            qInfo().noquote()
+            << "[Debug] Fenster mit 0x164 gefunden:"
+            << win->name
+            << "Zeile:" << tokens[i-1].orderIndex
+            << "Header:" << tokens[i-1].value;
+        }
         // =========================================================
         // Window-Header
         // =========================================================
@@ -218,7 +227,7 @@ void LayoutManager::processLayout()
     for (auto& wndPtr : m_windows)
     {
         if (!wndPtr) continue;
-        validateWindowFlags(wndPtr.get());
+         validateWindowFlags(wndPtr.get());
 
         for (auto& ctrlPtr : wndPtr->controls)
         {
@@ -247,54 +256,39 @@ void LayoutManager::validateWindowFlags(WindowData* win)
         return;
     }
 
-    // 🔹 1. Sonderfall: bekannte Fenster mit „verrutschten“ Low-Word-Bits
-    //    (MAP, MINIMAP, MAP_EX, NAVIGATOR, WORLD_MAP)
-    static const QSet<QString> kNormalizeLowWordWindows = {
-        QStringLiteral("APP_MAP"),
-        QStringLiteral("APP_COMMUNICATION_CHAT"),
-        QStringLiteral("APP_MAP_EX"),
-        QStringLiteral("APP_MINIMAP"),
-        QStringLiteral("APP_NAVIGATOR"),
-        QStringLiteral("APP_WORLD_MAP"),
-        QStringLiteral("APP_QUEST_QUICK_INFO")
-    };
+    // 🔹 Zerlegen in High- und Low-Word
+    const quint32 lowWord  = parsedWin & 0x0000FFFFu;
+    const quint32 highWord = parsedWin & 0xFFFF0000u;
 
-    const quint32 lowWord  = parsedWin & 0x0000FFFF;
-    const quint32 highWord = parsedWin & 0xFFFF0000;
-
-    if (lowWord != 0 && kNormalizeLowWordWindows.contains(win->name))
+    // 🔹 Prüfen, ob verrutschte Bits vorhanden sind:
+    // Fall 1 → Nur Low-Word-Bits (kein High-Word gesetzt)
+    // Fall 2 → Mischung aus High- und Low-Word (Low-Word-Bits zusätzlich aktiv)
+    if ((lowWord != 0u && highWord == 0u) ||
+        (lowWord != 0u && highWord != 0u))
     {
-        // Info-Log, damit man sieht, was korrigiert wurde
         qInfo().noquote()
-            << "[LayoutManager] Normalisiere Low-Word-Bits für Fenster"
-            << win->name
-            << "alte Maske=0x"
-            << QString::number(parsedWin, 16).toUpper();
+        << "[LayoutManager] Shift korrigiert Fenster"
+        << win->name
+        << "Maske alt=0x" << QString::number(parsedWin, 16).toUpper();
 
-        // Low-Word-Bits in den High-Word-Bereich verschieben
-        quint32 shiftedLow = (lowWord << 16);
-
-        // Neue Maske: ursprüngliche High-Bits + hochgeschobenes Low-Word
+        // 🔸 Low-Word-Bits um 16 nach oben verschieben
+        const quint32 shiftedLow = (lowWord << 16);
         parsedWin = highWord | shiftedLow;
 
-        // Wenn du die Low-Bits wirklich komplett „weghaben“ willst:
-        // parsedWin &= 0xFFFF0000;
-
-        // Maske im WindowData ebenfalls aktualisieren
         win->flagsMask = parsedWin;
 
         qInfo().noquote()
-            << "[LayoutManager] → normalisierte Maske=0x"
+            << "[LayoutManager] → Maske neu=0x"
             << QString::number(parsedWin, 16).toUpper();
     }
 
-    // 🔹 2. Ab hier normale High-Word-Validierung gegen m_windowFlags
+    // 🔹 Jetzt normale Validierung gegen bekannte Window-Flags
     QStringList matchedWindowFlags;
     quint32 knownWindowBits = 0;
 
     for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
     {
-        const quint32 flagMask = it.value();   // bei dir: raw << 16
+        const quint32 flagMask = it.value();
         knownWindowBits |= flagMask;
 
         if ((parsedWin & flagMask) == flagMask)
@@ -302,7 +296,6 @@ void LayoutManager::validateWindowFlags(WindowData* win)
     }
 
     const quint32 unknownBits = parsedWin & ~knownWindowBits;
-
     win->valid        = (unknownBits == 0);
     win->resolvedMask = matchedWindowFlags;
     win->flagsMask    = parsedWin;

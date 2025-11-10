@@ -16,6 +16,7 @@
 #include "layout/LayoutBackend.h"
 #include "defines/DefineManager.h"
 #include "defines/DefineBackend.h"
+#include "defines/BehaviorManager.h"
 #include "defines/FlagManager.h"
 #include "texts/TextManager.h"
 #include "texts/TextBackend.h"
@@ -83,6 +84,7 @@ private:
     std::unique_ptr<TextManager>    m_textManager;
     std::unique_ptr<TextBackend>    m_textBackend;
     std::unique_ptr<LayoutManager>  m_layoutManager;
+    std::unique_ptr<BehaviorManager> m_behaviorManager;
 
     // 🔧 Ressourcen
     QMap<QString, QIcon>   m_icons;
