@@ -18,9 +18,12 @@ BehaviorManager::BehaviorManager(FlagManager* flagMgr,
 
 BehaviorInfo BehaviorManager::resolveBehavior(const ControlData& ctrl) const
 {
-    Q_UNUSED(ctrl);
     BehaviorInfo info;
-    // absichtlich leer → NO-OP
+    if (ctrl.type == "WTYPE_TABCTRL") {
+        bool vertical = (ctrl.flagsMask & 0x20260000);
+        info.attributes["orientation"] = vertical ? "vertical" : "horizontal";
+        qInfo() << "[Behavior]" << ctrl.id << "->" << info.attributes["orientation"];
+    }
     return info;
 }
 
