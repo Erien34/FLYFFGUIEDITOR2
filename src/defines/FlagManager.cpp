@@ -178,6 +178,7 @@ void FlagManager::generateFlags(const QString& sourceDir,
     // 🔹 HIER — nach dem Scan, bevor die Dateien geschrieben werden
     applyDefaultWindowFlags();
     applyDefaultWindowTypes();
+    applyDefaultControlFlags();
 
     // 🧾 Statistik ausgeben
     qInfo().noquote()
@@ -224,54 +225,131 @@ void FlagManager::generateFlags(const QString& sourceDir,
 // -------------------------------------------------------------
 void FlagManager::applyDefaultWindowFlags()
 {
-    if (!m_windowFlags.isEmpty()) {
-        qInfo() << "[FlagManager] WindowFlags bereits vorhanden, Defaults werden übersprungen.";
-        return;
+    static const QMap<QString, QString> defaults = {
+        {"WBS_CAPTION",       "0X02000000"},
+        {"WBS_CHECK",         "0X00000008"},
+        {"WBS_CHILD",         "0X00020000"},
+        {"WBS_CHILDFRAME",    "0X00800000"},
+        {"WBS_DOCKING",       "0X04000000"},
+        {"WBS_EXTENSION",     "0X00000020"},
+        {"WBS_HELP",          "0X00000004"},
+        {"WBS_HIGHLIGHT",     "0X00000010"},
+        {"WBS_HIGHLIGHTPUSH", "0X00000020"},
+        {"WBS_HORI",          "0X00000001"},
+        {"WBS_HSCROLL",       "0X40000000"},
+        {"WBS_KEY",           "0X01000000"},
+        {"WBS_MANAGER",       "0X00100000"},
+        {"WBS_MAXIMIZEBOX",   "0X00000002"},
+        {"WBS_MENUITEM",      "0X00000100"},
+        {"WBS_MINIMIZEBOX",   "0X00000001"},
+        {"WBS_MODAL",         "0X00080000"},
+        {"WBS_MONEY",         "0X00000004"},
+        {"WBS_MOVE",          "0X00010000"},
+        {"WBS_NOCENTER",      "0X00000080"},
+        {"WBS_NODRAWFRAME",   "0X00040000"},
+        {"WBS_NOFOCUS",       "0X80000000"},
+        {"WBS_NOFRAME",       "0X00200000"},
+        {"WBS_NOMENUICON",    "0X00000400"},
+        {"WBS_OVERRIDE_FIRST","0X00000040"},
+        {"WBS_PIN",           "0X00000010"},
+        {"WBS_POPUP",         "0X08000000"},
+        {"WBS_PUSHLIKE",      "0X00000200"},
+        {"WBS_RADIO",         "0X00000004"},
+        {"WBS_SOUND",         "0X00400000"},
+        {"WBS_SPRITE",        "0X00000002"},
+        {"WBS_TEXT",          "0X00000001"},
+        {"WBS_THICKFRAME",    "0X00000040"},
+        {"WBS_TOPMOST",       "0X10000000"},
+        {"WBS_VERT",          "0X00000002"},
+        {"WBS_VIEW",          "0X00000008"},
+        {"WBS_VSCROLL",       "0X20000000"}
+    };
+
+    for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+        if (!m_windowFlags.contains(it.key())) {
+            m_windowFlags.insert(it.key(), it.value());
+            qInfo() << "[FlagManager] Default Window-Flag ergänzt:"
+                    << it.key() << "=" << it.value();
+        }
     }
 
-    qInfo() << "[FlagManager] Wende Default Window Base Style Flags an...";
-
-    m_windowFlags.insert("WBS_CAPTION",       "0X02000000");
-    m_windowFlags.insert("WBS_CHECK",         "0X00000008");
-    m_windowFlags.insert("WBS_CHILD",         "0X00020000");
-    m_windowFlags.insert("WBS_CHILDFRAME",    "0X00800000");
-    m_windowFlags.insert("WBS_DOCKING",       "0X04000000");
-    m_windowFlags.insert("WBS_EXTENSION",     "0X00000020");
-    m_windowFlags.insert("WBS_HELP",          "0X00000004");
-    m_windowFlags.insert("WBS_HIGHLIGHT",     "0X00000010");
-    m_windowFlags.insert("WBS_HIGHLIGHTPUSH", "0X00000020");
-    m_windowFlags.insert("WBS_HORI",          "0X00000001");
-    m_windowFlags.insert("WBS_HSCROLL",       "0X40000000");
-    m_windowFlags.insert("WBS_KEY",           "0X01000000");
-    m_windowFlags.insert("WBS_MANAGER",       "0X00100000");
-    m_windowFlags.insert("WBS_MAXIMIZEBOX",   "0X00000002");
-    m_windowFlags.insert("WBS_MENUITEM",      "0X00000100");
-    m_windowFlags.insert("WBS_MINIMIZEBOX",   "0X00000001");
-    m_windowFlags.insert("WBS_MODAL",         "0X00080000");
-    m_windowFlags.insert("WBS_MONEY",         "0X00000004");
-    m_windowFlags.insert("WBS_MOVE",          "0X00010000");
-    m_windowFlags.insert("WBS_NOCENTER",      "0X00000080");
-    m_windowFlags.insert("WBS_NODRAWFRAME",   "0X00040000");
-    m_windowFlags.insert("WBS_NOFOCUS",       "0X80000000");
-    m_windowFlags.insert("WBS_NOFRAME",       "0X00200000");
-    m_windowFlags.insert("WBS_NOMENUICON",    "0X00000400");
-    m_windowFlags.insert("WBS_OVERRIDE_FIRST","0X00000040");
-    m_windowFlags.insert("WBS_PIN",           "0X00000010");
-    m_windowFlags.insert("WBS_POPUP",         "0X08000000");
-    m_windowFlags.insert("WBS_PUSHLIKE",      "0X00000200");
-    m_windowFlags.insert("WBS_RADIO",         "0X00000004");
-    m_windowFlags.insert("WBS_SOUND",         "0X00400000");
-    m_windowFlags.insert("WBS_SPRITE",        "0X00000002");
-    m_windowFlags.insert("WBS_TEXT",          "0X00000001");
-    m_windowFlags.insert("WBS_THICKFRAME",    "0X00000040");
-    m_windowFlags.insert("WBS_TOPMOST",       "0X10000000");
-    m_windowFlags.insert("WBS_VERT",          "0X00000002");
-    m_windowFlags.insert("WBS_VIEW",          "0X00000008");
-    m_windowFlags.insert("WBS_VSCROLL",       "0X20000000");
-
-    qInfo() << "[FlagManager] Default WindowFlags hinzugefügt:" << m_windowFlags.size();
+    qInfo() << "[FlagManager] Default WindowFlags hinzugefügt, gesamt:"
+            << m_windowFlags.size();
 }
 
+void FlagManager::applyDefaultControlFlags()
+{
+    static const QMap<QString, QString> win32Defaults = {
+        // 🟦 Button Styles (BS_*)
+        {"BS_PUSHBUTTON",     "0x00000000"},
+        {"BS_DEFPUSHBUTTON",  "0x00000001"},
+        {"BS_CHECKBOX",       "0x00000002"},
+        {"BS_AUTOCHECKBOX",   "0x00000003"},
+        {"BS_RADIOBUTTON",    "0x00000004"},
+        {"BS_3STATE",         "0x00000005"},
+        {"BS_AUTO3STATE",     "0x00000006"},
+        {"BS_GROUPBOX",       "0x00000007"},
+        {"BS_AUTORADIOBUTTON","0x00000009"},
+        {"BS_ICON",           "0x00000040"},
+        {"BS_BITMAP",         "0x00000080"},
+        {"BS_LEFT",           "0x00000100"},
+        {"BS_RIGHT",          "0x00000200"},
+        {"BS_TOP",            "0x00000400"},
+        {"BS_BOTTOM",         "0x00000800"},
+        {"BS_VCENTER",        "0x00000C00"},
+
+        // 🟩 Edit Styles (ES_*)
+        {"ES_LEFT",           "0x0000"},
+        {"ES_CENTER",         "0x0001"},
+        {"ES_RIGHT",          "0x0002"},
+        {"ES_MULTILINE",      "0x0004"},
+        {"ES_PASSWORD",       "0x0020"},
+        {"ES_AUTOVSCROLL",    "0x0040"},
+        {"ES_AUTOHSCROLL",    "0x0080"},
+        {"ES_NOHIDESEL",      "0x0100"},
+        {"ES_OEMCONVERT",     "0x0400"},
+        {"ES_READONLY",       "0x0800"},
+        {"ES_WANTRETURN",     "0x1000"},
+        {"ES_NUMBER",         "0x2000"},
+
+        // 🟨 Static Styles (SS_*)
+        {"SS_LEFT",           "0x00000000"},
+        {"SS_CENTER",         "0x00000001"},
+        {"SS_RIGHT",          "0x00000002"},
+        {"SS_ICON",           "0x00000003"},
+        {"SS_BITMAP",         "0x0000000E"},
+        {"SS_NOTIFY",         "0x00000100"},
+
+        // 🟥 ListBox Styles (LBS_*)
+        {"LBS_NOTIFY",        "0x0001"},
+        {"LBS_SORT",          "0x0002"},
+        {"LBS_NOREDRAW",      "0x0004"},
+        {"LBS_MULTIPLESEL",   "0x0008"},
+        {"LBS_OWNERDRAWFIXED","0x0010"},
+        {"LBS_OWNERDRAWVARIABLE","0x0020"},
+        {"LBS_HASSTRINGS",    "0x0040"},
+        {"LBS_USETABSTOPS",   "0x0080"},
+        {"LBS_NOINTEGRALHEIGHT","0x0100"},
+        {"LBS_MULTICOLUMN",   "0x0200"},
+        {"LBS_WANTKEYBOARDINPUT","0x0400"},
+        {"LBS_EXTENDEDSEL",   "0x0800"},
+        {"LBS_DISABLENOSCROLL","0x1000"}
+    };
+
+    int added = 0;
+    for (auto it = win32Defaults.constBegin(); it != win32Defaults.constEnd(); ++it) {
+        if (!m_controlFlags.contains(it.key())) {
+            m_controlFlags.insert(it.key(), it.value());
+            qInfo() << "[FlagManager] Default Win32 Control-Flag ergänzt:"
+                    << it.key() << "=" << it.value();
+            ++added;
+        }
+    }
+
+    qInfo() << QString("[FlagManager] Default ControlFlags hinzugefügt: %1 neu, gesamt: %2")
+                   .arg(added)
+                   .arg(m_controlFlags.size());
+}
 
 // -------------------------------------------------------------
 // Standard Window Types ergänzen

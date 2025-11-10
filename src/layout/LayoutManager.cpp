@@ -52,7 +52,7 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
     m_controlRulesLoaded = false;
 
     // ----------------------------------------------------
-    // 🪟 Window Flags (werden links-shifted)
+    // 🪟 Window Flags
     // ----------------------------------------------------
     for (auto it = winObj.constBegin(); it != winObj.constEnd(); ++it)
     {
@@ -63,7 +63,7 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
         bool ok = false;
         quint32 raw = val.toUInt(&ok, 16);
         if (ok)
-            m_windowFlags[it.key()] = raw;
+            m_windowFlags[it.key()] = (raw << 16);
         else
             qWarning().noquote()
                 << "[LayoutManager] Ungültiger Window-Flag-Wert:"
@@ -82,7 +82,7 @@ void LayoutManager::refreshFromFiles(const QString& wndPath, const QString& ctrl
         bool ok = false;
         quint32 raw = val.toUInt(&ok, 16);
         if (ok)
-            m_controlFlags[it.key()] = (raw << 16);
+            m_controlFlags[it.key()] = raw;
         else
             qWarning().noquote()
                 << "[LayoutManager] Ungültiger Control-Flag-Wert:"
@@ -240,36 +240,82 @@ void LayoutManager::validateWindowFlags(WindowData* win)
 {
     if (!win) return;
 
-    const quint32 parsedWin = win->flagsMask;
+    quint32 parsedWin = win->flagsMask;
+
     if (m_windowFlags.isEmpty()) {
         qWarning() << "[LayoutManager] Keine Window-Flags geladen!";
         return;
     }
 
+    // 🔹 1. Sonderfall: bekannte Fenster mit „verrutschten“ Low-Word-Bits
+    //    (MAP, MINIMAP, MAP_EX, NAVIGATOR, WORLD_MAP)
+    static const QSet<QString> kNormalizeLowWordWindows = {
+        QStringLiteral("APP_MAP"),
+        QStringLiteral("APP_COMMUNICATION_CHAT"),
+        QStringLiteral("APP_MAP_EX"),
+        QStringLiteral("APP_MINIMAP"),
+        QStringLiteral("APP_NAVIGATOR"),
+        QStringLiteral("APP_WORLD_MAP"),
+        QStringLiteral("APP_QUEST_QUICK_INFO")
+    };
+
+    const quint32 lowWord  = parsedWin & 0x0000FFFF;
+    const quint32 highWord = parsedWin & 0xFFFF0000;
+
+    if (lowWord != 0 && kNormalizeLowWordWindows.contains(win->name))
+    {
+        // Info-Log, damit man sieht, was korrigiert wurde
+        qInfo().noquote()
+            << "[LayoutManager] Normalisiere Low-Word-Bits für Fenster"
+            << win->name
+            << "alte Maske=0x"
+            << QString::number(parsedWin, 16).toUpper();
+
+        // Low-Word-Bits in den High-Word-Bereich verschieben
+        quint32 shiftedLow = (lowWord << 16);
+
+        // Neue Maske: ursprüngliche High-Bits + hochgeschobenes Low-Word
+        parsedWin = highWord | shiftedLow;
+
+        // Wenn du die Low-Bits wirklich komplett „weghaben“ willst:
+        // parsedWin &= 0xFFFF0000;
+
+        // Maske im WindowData ebenfalls aktualisieren
+        win->flagsMask = parsedWin;
+
+        qInfo().noquote()
+            << "[LayoutManager] → normalisierte Maske=0x"
+            << QString::number(parsedWin, 16).toUpper();
+    }
+
+    // 🔹 2. Ab hier normale High-Word-Validierung gegen m_windowFlags
     QStringList matchedWindowFlags;
     quint32 knownWindowBits = 0;
 
     for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
     {
-        const quint32 shiftedFlag = it.value();
-        knownWindowBits |= shiftedFlag;
+        const quint32 flagMask = it.value();   // bei dir: raw << 16
+        knownWindowBits |= flagMask;
 
-        if ((parsedWin & shiftedFlag) == shiftedFlag)
+        if ((parsedWin & flagMask) == flagMask)
             matchedWindowFlags << it.key();
     }
 
     const quint32 unknownBits = parsedWin & ~knownWindowBits;
-    win->valid = (unknownBits == 0);
+
+    win->valid        = (unknownBits == 0);
     win->resolvedMask = matchedWindowFlags;
-    win->flagsMask = parsedWin;
+    win->flagsMask    = parsedWin;
 
     if (!win->valid)
-        qWarning().noquote() << "[LayoutManager] Ungültige Fensterbits:"
-                             << QString("0x%1 → unbekannt: 0x%2")
-                                    .arg(QString::number(parsedWin, 16).toUpper())
-                                    .arg(QString::number(unknownBits, 16).toUpper());
+    {
+        qWarning().noquote()
+        << "[LayoutManager] Ungültige Fensterbits:"
+        << QString("0x%1 → unbekannt: 0x%2")
+                .arg(QString::number(parsedWin, 16).toUpper())
+                .arg(QString::number(unknownBits, 16).toUpper());
+    }
 }
-
 // -------------------------------------------------------------
 // Validate Control Flags
 // -------------------------------------------------------------
@@ -278,6 +324,10 @@ void LayoutManager::validateControlFlags(ControlData* ctrl)
     if (!ctrl) return;
 
     const quint32 parsedCtrlMask = ctrl->flagsMask;
+
+    // 🔹 Nur Low-Word prüfen (untere 16 Bits)
+    const quint32 ctrlLow = parsedCtrlMask & 0x0000FFFF;
+
     if (m_controlFlags.isEmpty()) {
         qWarning() << "[LayoutManager] Keine Control-Flags geladen!";
         return;
@@ -288,16 +338,31 @@ void LayoutManager::validateControlFlags(ControlData* ctrl)
 
     for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
     {
-        const quint32 shifted = it.value();
-        knownBits |= shifted;
-        if ((parsedCtrlMask & shifted) == shifted)
+        const quint32 bit = it.value();
+        knownBits |= bit;
+        if ((ctrlLow & bit) == bit)
             matchedControlFlags << it.key();
     }
 
-    const quint32 unknownBits = parsedCtrlMask & ~knownBits;
-    ctrl->valid = (unknownBits == 0);
+    // 🔹 Bits, die NICHT in control_flags.json vorkommen
+    const quint32 unknownBits = ctrlLow & ~knownBits;
+
+    // 🔹 Falls Low-Word leer ist, gilt das Control als „ohne Styles → gültig“
+    if (ctrlLow == 0)
+        ctrl->valid = true;
+    else
+        ctrl->valid = (unknownBits == 0);
+
     ctrl->resolvedMask = matchedControlFlags;
     ctrl->flagsMask = parsedCtrlMask;
+
+    if (!ctrl->valid)
+    {
+        qWarning().noquote() << "[LayoutManager] Unbekannte Control-Bits:"
+                             << QString("0x%1 (Low-Word: 0x%2)")
+                                    .arg(QString::number(parsedCtrlMask, 16).toUpper())
+                                    .arg(QString::number(ctrlLow, 16).toUpper());
+    }
 }
 
 // -------------------------------------------------------------
@@ -416,17 +481,11 @@ void LayoutManager::generateDefaultControlFlagRules()
     QJsonArray valid;
 
     // 🔹 Alle bekannten Control-Flags aus m_controlFlags übernehmen
-    // (m_controlFlags wird aus control_flags.json geladen)
+    //    (egal welches Prefix – was hier drin ist, gilt als grundsätzlich erlaubt)
     for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
     {
         const QString& flagName = it.key();
-        if (flagName.startsWith("CBS_") ||
-            flagName.startsWith("EBS_") ||
-            flagName.startsWith("BS_")  ||
-            flagName.startsWith("WLVS_"))
-        {
-            valid.append(flagName);
-        }
+        valid.append(flagName);
     }
 
     defaults["valid"] = valid;
@@ -442,6 +501,7 @@ void LayoutManager::generateDefaultControlFlagRules()
         exclusive.insert(a, arr);
     };
 
+    // EBS_* (FlyFF-Edit-Styles)
     if (m_controlFlags.contains("EBS_LEFT") &&
         m_controlFlags.contains("EBS_CENTER") &&
         m_controlFlags.contains("EBS_RIGHT"))
@@ -451,19 +511,39 @@ void LayoutManager::generateDefaultControlFlagRules()
         addExclusive("EBS_RIGHT",  {"EBS_LEFT",   "EBS_CENTER"});
     }
 
+    // Optional: Win32-Edit-Styles ES_LEFT/CENTER/RIGHT
+    if (m_controlFlags.contains("ES_LEFT") &&
+        m_controlFlags.contains("ES_CENTER") &&
+        m_controlFlags.contains("ES_RIGHT"))
+    {
+        addExclusive("ES_LEFT",   {"ES_CENTER", "ES_RIGHT"});
+        addExclusive("ES_CENTER", {"ES_LEFT",   "ES_RIGHT"});
+        addExclusive("ES_RIGHT",  {"ES_LEFT",   "ES_CENTER"});
+    }
+
+    // Optional: Win32-Static-Styles SS_LEFT/CENTER/RIGHT
+    if (m_controlFlags.contains("SS_LEFT") &&
+        m_controlFlags.contains("SS_CENTER") &&
+        m_controlFlags.contains("SS_RIGHT"))
+    {
+        addExclusive("SS_LEFT",   {"SS_CENTER", "SS_RIGHT"});
+        addExclusive("SS_CENTER", {"SS_LEFT",   "SS_RIGHT"});
+        addExclusive("SS_RIGHT",  {"SS_LEFT",   "SS_CENTER"});
+    }
+
     if (!exclusive.isEmpty())
         defaults["exclusive"] = exclusive;
 
     // 🔹 Root-Objekt zusammensetzen
     root["Default"] = defaults;
 
-    // 🔹 Speichern über deinen Backend
+    // 🔹 Speichern über Backend
     m_backend.saveControlFlagRules(root);
 
-    qInfo() << "[LayoutManager] Default control_flag_rules.json generiert ("
-            << valid.size() << " Flags eingetragen ).";
+    qInfo().noquote()
+        << "[LayoutManager] Default control_flag_rules.json generiert ("
+        << valid.size() << " Flags eingetragen ).";
 }
-
 // -------------------------------------------------------------
 // Serialize Layout (unverändert, nicht kürzen!)
 // -------------------------------------------------------------
@@ -621,12 +701,12 @@ void LayoutManager::generateUnknownControls()
 {
     m_unknownControlBits.clear();
 
-    if (m_windows.empty() || m_controlFlags.isEmpty())
-    {
+    if (m_windows.empty() || m_controlFlags.isEmpty()) {
         m_backend.saveUndefinedControlFlags(QJsonObject{});
         return;
     }
 
+    // 🔹 Alle bekannten Bits (nur Low-Word)
     quint32 knownBits = 0;
     for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
         knownBits |= it.value();
@@ -641,7 +721,13 @@ void LayoutManager::generateUnknownControls()
             if (!ctrl)
                 continue;
 
-            const quint32 unknownMask = ctrl->flagsMask & ~knownBits;
+            const quint32 ctrlLow = ctrl->flagsMask & 0x0000FFFF;
+
+            // 🔹 Wenn keine Styles im Low-Word → gültig, überspringen
+            if (ctrlLow == 0)
+                continue;
+
+            const quint32 unknownMask = ctrlLow & ~knownBits;
             if (unknownMask == 0u)
                 continue;
 
@@ -656,8 +742,8 @@ void LayoutManager::generateUnknownControls()
         }
     }
 
-    if (m_unknownControlBits.isEmpty())
-    {
+    // 🔹 Export
+    if (m_unknownControlBits.isEmpty()) {
         m_backend.saveUndefinedControlFlags(QJsonObject{});
         return;
     }
@@ -680,9 +766,7 @@ void LayoutManager::generateUnknownControls()
     }
 
     if (!m_backend.saveUndefinedControlFlags(root))
-    {
         qWarning().noquote() << "[LayoutManager] Konnte undefined_control_flags.json nicht aktualisieren.";
-    }
 }
 
 void LayoutManager::reloadWindowFlagRules()

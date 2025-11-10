@@ -50,6 +50,7 @@ private:
 
     /// ergänzt Standard-Fenster-Typen (WTYPE_*)
     void applyDefaultWindowTypes();
+    void applyDefaultControlFlags();
 
     /// speichert beliebige Key/Value-Maps als JSON
     void saveJsonFile(const QString& path, const QMap<QString, QString>& data, const QString& label);
