@@ -102,7 +102,7 @@ void PropertyPanel::showWindowProps(const std::shared_ptr<WindowData>& wnd)
 
     // 🔹 Regelobjekt laden
     QJsonObject rules;
-    const QJsonObject windowRules = bm->getWindowFlagRules();
+    const QJsonObject windowRules = bm->windowFlagRules();
 
     if (!windowRules.isEmpty()) {
         if (windowRules.contains(wnd->name))
@@ -225,7 +225,7 @@ void PropertyPanel::showControlProps(const std::shared_ptr<WindowData>& wnd,
 
     // 🔹 Regelobjekt für diesen Control-Typ laden
     QJsonObject rules;
-    const QJsonObject controlRules = bm->getControlFlagRules();
+    const QJsonObject controlRules = bm->controlFlagRules();
 
     if (!controlRules.isEmpty()) {
         if (controlRules.contains(ctrl->type))
@@ -349,7 +349,7 @@ QWidget* PropertyPanel::createFlagGroup(const QString& title,
                     });
         }
 
-        connect(cb, &QCheckBox::stateChanged, this,
+        connect(cb, &::QCheckBox::checkStateChanged, this,
                 [this, flagMask, flagName, isWindowGroup](int state) {
                     if (m_isRefreshing)
                         return;

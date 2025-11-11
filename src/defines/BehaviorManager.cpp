@@ -1,74 +1,204 @@
-#include "BehaviorManager.h"
-#include "LayoutManager.h"
-#include "LayoutBackend.h"
+#include "defines/BehaviorManager.h"
 
-#include <QDebug>
-#include <QJsonObject>
+#include "defines/FlagManager.h"
+#include "defines/DefineManager.h"
+#include "texts/TextManager.h"
+#include "layout/LayoutManager.h"
+#include "layout/LayoutBackend.h"
+#include "layout/model/WindowData.h"
+#include "layout/model/ControlData.h"
+
 #include <QJsonArray>
-#include <QJsonDocument>
+#include <QDebug>
 
-// ----------------------------------------------------------
+Q_DECLARE_METATYPE(ControlCapabilities)
+
+// ---------------------------------------------------------
 // Konstruktor
-// ----------------------------------------------------------
-BehaviorManager::BehaviorManager(FlagManager* flagMgr,
-                                 TextManager* textMgr,
+// ---------------------------------------------------------
+BehaviorManager::BehaviorManager(FlagManager*   flagMgr,
+                                 TextManager*   textMgr,
                                  DefineManager* defineMgr,
-                                 LayoutManager* layoutMgr)
+                                 LayoutManager* layoutMgr,
+                                 LayoutBackend* layoutBackend)
     : m_flagMgr(flagMgr)
     , m_textMgr(textMgr)
     , m_defineMgr(defineMgr)
     , m_layoutMgr(layoutMgr)
+    , m_layoutBackend(layoutBackend)
 {
+    initializeBaseBehaviors();
 }
 
-// ----------------------------------------------------------
-// High-Level Behavior API – vorerst NO-OP
-// ----------------------------------------------------------
-BehaviorInfo BehaviorManager::resolveBehavior(const ControlData& ctrl) const
+// ---------------------------------------------------------
+// Basisverhalten für alle relevanten WTYPE_* hartcodieren
+// ---------------------------------------------------------
+void BehaviorManager::initializeBaseBehaviors()
 {
-    Q_UNUSED(ctrl);
-    BehaviorInfo info;
-    return info;
+    m_baseBehaviors.clear();
+
+    // --------------------------
+    // Button
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "button";
+        b.capabilities  = ControlCapability_CanClick
+                         | ControlCapability_CanFocus;
+        b.defaults["state"]        = "normal";
+        b.defaults["defaultColor"] = QColor(255, 255, 255);
+        b.defaults["textSupport"]  = true;
+        m_baseBehaviors.insert("WTYPE_BUTTON", b);
+    }
+
+    // --------------------------
+    // Static / Label
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "label";
+        b.capabilities  = ControlCapability_None;
+        b.defaults["textSupport"]  = true;
+        b.defaults["textAlign"]    = "center";
+        m_baseBehaviors.insert("WTYPE_STATIC", b);
+    }
+
+    // --------------------------
+    // Textanzeige (mehrzeilig)
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "text";
+        b.capabilities  = ControlCapability_CanScroll;
+        b.defaults["textSupport"]  = true;
+        b.defaults["multiline"]    = true;
+        m_baseBehaviors.insert("WTYPE_TEXT", b);
+    }
+
+    // --------------------------
+    // Editfeld
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "edit";
+        b.capabilities  = ControlCapability_CanFocus
+                         | ControlCapability_CanTextInput
+                         | ControlCapability_CanScroll;
+        b.defaults["textSupport"]  = true;
+        b.defaults["multiline"]    = false;
+        b.defaults["maxLength"]    = 128;
+        m_baseBehaviors.insert("WTYPE_EDITCTRL", b);
+    }
+
+    // --------------------------
+    // Listbox
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "listbox";
+        b.capabilities  = ControlCapability_CanFocus
+                         | ControlCapability_CanSelectItems
+                         | ControlCapability_CanScroll;
+        b.defaults["multiSelect"]  = false;
+        m_baseBehaviors.insert("WTYPE_LISTBOX", b);
+    }
+
+    // --------------------------
+    // Kombobox
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "combobox";
+        b.capabilities  = ControlCapability_CanFocus
+                         | ControlCapability_CanSelectItems
+                         | ControlCapability_CanClick
+                         | ControlCapability_CanScroll;
+        b.defaults["textSupport"]  = true;  // editable combos möglich
+        m_baseBehaviors.insert("WTYPE_COMBOBOX", b);
+    }
+
+    // --------------------------
+    // TabControl
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "tab";
+        b.capabilities  = ControlCapability_CanClick
+                         | ControlCapability_CanFocus
+                         | ControlCapability_IsContainer;
+        b.defaults["hasTabs"]      = true;
+        m_baseBehaviors.insert("WTYPE_TABCTRL", b);
+    }
+
+    // --------------------------
+    // TreeControl
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "tree";
+        b.capabilities  = ControlCapability_CanFocus
+                         | ControlCapability_CanSelectItems
+                         | ControlCapability_CanScroll
+                         | ControlCapability_CanToggle;
+        b.defaults["multiSelect"]  = false;
+        m_baseBehaviors.insert("WTYPE_TREECTRL", b);
+    }
+
+    // --------------------------
+    // GroupBox
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "groupbox";
+        b.capabilities  = ControlCapability_IsContainer;
+        b.defaults["textSupport"]  = true;
+        m_baseBehaviors.insert("WTYPE_GROUPBOX", b);
+    }
+
+    // --------------------------
+    // Custom
+    // --------------------------
+    {
+        BaseBehavior b;
+        b.category      = "custom";
+        b.capabilities  = ControlCapability_CustomBehavior;
+        m_baseBehaviors.insert("WTYPE_CUSTOM", b);
+    }
 }
 
-void BehaviorManager::applyBehavior(ControlData& ctrl) const
+// ---------------------------------------------------------
+// Flags aus JSON laden (Fenster / Controls)
+// ---------------------------------------------------------
+void BehaviorManager::refreshFlagsFromFiles(const QString& wndFlagsPath,
+                                            const QString& ctrlFlagsPath)
 {
-    Q_UNUSED(ctrl);
-}
+    Q_UNUSED(wndFlagsPath)
+    Q_UNUSED(ctrlFlagsPath)
 
-// ----------------------------------------------------------
-// Flags & Types laden (ehemals LayoutManager::refreshFromFiles)
-// ----------------------------------------------------------
-void BehaviorManager::refreshFlagsFromFiles()
-{
-    if (!m_layoutMgr) {
-        qWarning() << "[BehaviorManager] Kein LayoutManager gesetzt – "
-                      "kann Flags nicht laden.";
+    if (!m_layoutBackend) {
+        qWarning() << "[BehaviorManager] Kein LayoutBackend – Flags können nicht geladen werden.";
+        m_windowFlags.clear();
+        m_controlFlags.clear();
         return;
     }
 
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    const QJsonObject winObj  = backend.loadWindowFlags();
-    const QJsonObject ctrlObj = backend.loadControlFlags();
-    const QJsonObject typeObj = backend.loadWindowTypes();
+    const QJsonObject winObj  = m_layoutBackend->loadWindowFlags();
+    const QJsonObject ctrlObj = m_layoutBackend->loadControlFlags();
 
     m_windowFlags.clear();
     m_controlFlags.clear();
-    m_windowTypes.clear();
+
+    m_windowRulesLoaded  = false;
+    m_controlRulesLoaded = false;
     m_windowRules = QJsonObject{};
     m_controlRules = QJsonObject{};
-    m_windowRulesLoaded = false;
-    m_controlRulesLoaded = false;
 
-    // -------------------------
-    // Window Flags (links-shifted)
-    // -------------------------
+    // 🪟 Window-Flags (High-Word)
     for (auto it = winObj.constBegin(); it != winObj.constEnd(); ++it)
     {
         QString val = it.value().toString().trimmed().toUpper();
         if (val.startsWith("0X")) val.remove(0, 2);
-        if (val.endsWith("L")) val.chop(1);
+        if (val.endsWith("L"))   val.chop(1);
 
         bool ok = false;
         quint32 raw = val.toUInt(&ok, 16);
@@ -80,14 +210,12 @@ void BehaviorManager::refreshFlagsFromFiles()
                 << it.key() << "=" << it.value().toVariant().toString();
     }
 
-    // -------------------------
-    // Control Flags
-    // -------------------------
+    // 🔹 Control-Flags (Low-Word)
     for (auto it = ctrlObj.constBegin(); it != ctrlObj.constEnd(); ++it)
     {
         QString val = it.value().toString().trimmed().toUpper();
         if (val.startsWith("0X")) val.remove(0, 2);
-        if (val.endsWith("L")) val.chop(1);
+        if (val.endsWith("L"))   val.chop(1);
 
         bool ok = false;
         quint32 raw = val.toUInt(&ok, 16);
@@ -99,521 +227,212 @@ void BehaviorManager::refreshFlagsFromFiles()
                 << it.key() << "=" << it.value().toString();
     }
 
-    // -------------------------
-    // Window Types
-    // -------------------------
-    for (auto it = typeObj.constBegin(); it != typeObj.constEnd(); ++it)
-    {
-        QString val = it.value().toString().trimmed().toUpper();
-        if (val.startsWith("0X")) val.remove(0, 2);
-        if (val.endsWith("L")) val.chop(1);
-
-        bool ok = false;
-        quint32 raw = val.toUInt(&ok, 16);
-        if (ok)
-            m_windowTypes[it.key()] = raw;
-        else
-            qWarning().noquote()
-                << "[BehaviorManager] Ungültiger WindowType-Wert:"
-                << it.key() << "=" << it.value().toString();
-    }
-
-    qInfo().noquote()
-        << QString("[BehaviorManager] Flags aktualisiert: Window=%1  Control=%2  Types=%3")
-               .arg(m_windowFlags.size())
-               .arg(m_controlFlags.size())
-               .arg(m_windowTypes.size());
+    qInfo() << "[BehaviorManager] Flags geladen:"
+            << "windows =" << m_windowFlags.size()
+            << "controls =" << m_controlFlags.size();
 }
 
-// ----------------------------------------------------------
-// Window-Flags validieren (ehemals LayoutManager::validateWindowFlags)
-// ----------------------------------------------------------
-void BehaviorManager::validateWindowFlags(WindowData* win)
+// ---------------------------------------------------------
+// Flag-Regeln lazy laden
+// ---------------------------------------------------------
+void BehaviorManager::reloadWindowFlagRules() const
 {
-    if (!win) return;
-
-    quint32 parsedWin = win->flagsMask;
-
-    if (m_windowFlags.isEmpty()) {
-        qWarning() << "[BehaviorManager] Keine Window-Flags geladen!";
+    if (!m_layoutBackend) {
+        qWarning() << "[BehaviorManager] Kein LayoutBackend – window_flag_rules.json kann nicht geladen werden.";
+        m_windowRules = QJsonObject{};
+        m_windowRulesLoaded = true;
         return;
     }
 
-    const quint32 lowWord  = parsedWin & 0x0000FFFFu;
-    const quint32 highWord = parsedWin & 0xFFFF0000u;
-
-    if ((lowWord != 0u && highWord == 0u) ||
-        (lowWord != 0u && highWord != 0u))
-    {
-        qInfo().noquote()
-        << "[BehaviorManager] Shift korrigiert Fenster"
-        << win->name
-        << "Maske alt=0x" << QString::number(parsedWin, 16).toUpper();
-
-        const quint32 shiftedLow = (lowWord << 16);
-        parsedWin = highWord | shiftedLow;
-
-        win->flagsMask = parsedWin;
-
-        qInfo().noquote()
-            << "[BehaviorManager] → Maske neu=0x"
-            << QString::number(parsedWin, 16).toUpper();
-    }
-
-    QStringList matchedWindowFlags;
-    quint32 knownWindowBits = 0;
-
-    for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
-    {
-        const quint32 flagMask = it.value();
-        knownWindowBits |= flagMask;
-
-        if ((parsedWin & flagMask) == flagMask)
-            matchedWindowFlags << it.key();
-    }
-
-    const quint32 unknownBits = parsedWin & ~knownWindowBits;
-    win->valid        = (unknownBits == 0);
-    win->resolvedMask = matchedWindowFlags;
-    win->flagsMask    = parsedWin;
-
-    if (!win->valid)
-    {
-        qWarning().noquote()
-        << "[BehaviorManager] Ungültige Fensterbits:"
-        << QString("0x%1 → unbekannt: 0x%2")
-                .arg(QString::number(parsedWin, 16).toUpper())
-                .arg(QString::number(unknownBits, 16).toUpper());
-    }
-}
-
-// ----------------------------------------------------------
-// Control-Flags validieren (ehemals LayoutManager::validateControlFlags)
-// ----------------------------------------------------------
-void BehaviorManager::validateControlFlags(ControlData* ctrl)
-{
-    if (!ctrl) return;
-
-    const quint32 parsedCtrlMask = ctrl->flagsMask;
-    const quint32 ctrlLow = parsedCtrlMask & 0x0000FFFF;
-
-    if (m_controlFlags.isEmpty()) {
-        qWarning() << "[BehaviorManager] Keine Control-Flags geladen!";
-        return;
-    }
-
-    QStringList matchedControlFlags;
-    quint32 knownBits = 0;
-
-    for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
-    {
-        const quint32 bit = it.value();
-        knownBits |= bit;
-        if ((ctrlLow & bit) == bit)
-            matchedControlFlags << it.key();
-    }
-
-    const quint32 unknownBits = ctrlLow & ~knownBits;
-
-    if (ctrlLow == 0)
-        ctrl->valid = true;
-    else
-        ctrl->valid = (unknownBits == 0);
-
-    ctrl->resolvedMask = matchedControlFlags;
-    ctrl->flagsMask    = parsedCtrlMask;
-
-    if (!ctrl->valid)
-    {
-        qWarning().noquote() << "[BehaviorManager] Unbekannte Control-Bits:"
-                             << QString("0x%1 (Low-Word: 0x%2)")
-                                    .arg(QString::number(parsedCtrlMask, 16).toUpper())
-                                    .arg(QString::number(ctrlLow, 16).toUpper());
-    }
-}
-
-// ----------------------------------------------------------
-// Update-Wrapper (ehemals LayoutManager::update*)
-// ----------------------------------------------------------
-void BehaviorManager::updateWindowFlags(const std::shared_ptr<WindowData>& wnd)
-{
-    if (!wnd)
-        return;
-
-    validateWindowFlags(wnd.get());
-}
-
-void BehaviorManager::updateControlFlags(const std::shared_ptr<ControlData>& ctrl)
-{
-    if (!ctrl)
-        return;
-
-    validateControlFlags(ctrl.get());
-    // generateUnknownControls wird später auf allen Controls ausgeführt,
-    // hier NICHT einzeln, um Spam zu vermeiden.
-}
-
-// ----------------------------------------------------------
-// ControlType-Analyse (ehemals LayoutManager::analyzeControlTypes)
-// ----------------------------------------------------------
-void BehaviorManager::analyzeControlTypes(const std::vector<std::shared_ptr<WindowData>>& windows)
-{
-    m_controlTypeProperties.clear();
-
-    for (const auto& wnd : windows)
-    {
-        if (!wnd) continue;
-
-        for (const auto& ctrl : wnd->controls)
-        {
-            if (!ctrl) continue;
-            auto& props = m_controlTypeProperties[ctrl->type];
-
-            if (!ctrl->id.isEmpty()) props.insert("ID");
-            if (!ctrl->texture.isEmpty()) props.insert("Texture");
-            props.insert("X1"); props.insert("Y1"); props.insert("X2"); props.insert("Y2");
-            if (!ctrl->flagsHex.isEmpty()) props.insert("FlagsHex");
-            if (ctrl->flagsMask != 0u) props.insert("FlagsMask");
-            if (ctrl->color.isValid()) props.insert("Color");
-        }
-    }
-
-    qInfo().noquote()
-        << QString("[BehaviorManager] ControlType-Analyse abgeschlossen: %1 Typen erkannt.")
-               .arg(m_controlTypeProperties.size());
-}
-
-bool BehaviorManager::allowsPropertyForType(const QString& type, const QString& property) const
-{
-    if (type.isEmpty() || property.isEmpty())
-        return false;
-
-    if (m_controlTypeProperties.isEmpty()) {
-        // const_cast ist hässlich, aber pragmatisch wie im alten Code
-        const_cast<BehaviorManager*>(this)->analyzeControlTypes(std::vector<std::shared_ptr<WindowData>>{});
-        // Hinweis: in der Praxis solltest du analyzeControlTypes mit echten Windows
-        // aus LayoutManager aufrufen, z.B. in processLayout.
-    }
-
-    const auto it = m_controlTypeProperties.constFind(type);
-    if (it == m_controlTypeProperties.constEnd())
-        return false;
-
-    if (it.value().contains(property))
-        return true;
-
-    for (const QString& prop : it.value())
-    {
-        if (prop.compare(property, Qt::CaseInsensitive) == 0)
-            return true;
-    }
-    return false;
-}
-
-// ----------------------------------------------------------
-// Default Window Flag Rules (ehemals generateDefaultWindowFlagRules)
-// ----------------------------------------------------------
-void BehaviorManager::generateDefaultWindowFlagRules()
-{
-    if (!m_layoutMgr) return;
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    QJsonObject root;
-    QJsonObject defaults;
-    QJsonArray valid;
-
-    for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
-    {
-        const QString& flagName = it.key();
-        if (flagName.startsWith("WBS_"))
-            valid.append(flagName);
-    }
-
-    defaults["valid"] = valid;
-
-    QJsonObject exclusive;
-
-    auto addExclusive = [&exclusive](const QString &a, const QStringList &others) {
-        QJsonArray arr;
-        for (const QString &o : others)
-            arr.append(o);
-        exclusive.insert(a, arr);
-    };
-
-    if (m_windowFlags.contains("WBS_NOFRAME") && m_windowFlags.contains("WBS_THICKFRAME"))
-    {
-        addExclusive("WBS_NOFRAME",   {"WBS_THICKFRAME"});
-        addExclusive("WBS_THICKFRAME",{"WBS_NOFRAME"});
-    }
-
-    if (m_windowFlags.contains("WBS_HORI") && m_windowFlags.contains("WBS_VERT"))
-    {
-        addExclusive("WBS_HORI", {"WBS_VERT"});
-        addExclusive("WBS_VERT", {"WBS_HORI"});
-    }
-
-    if (!exclusive.isEmpty())
-        defaults["exclusive"] = exclusive;
-
-    root["Default"] = defaults;
-
-    backend.saveWindowFlagRules(root);
-
-    qInfo() << "[BehaviorManager] Default window_flag_rules.json generiert ("
-            << valid.size() << " Flags eingetragen ).";
-}
-
-// ----------------------------------------------------------
-// Default Control Flag Rules (ehemals generateDefaultControlFlagRules)
-// ----------------------------------------------------------
-void BehaviorManager::generateDefaultControlFlagRules()
-{
-    if (!m_layoutMgr) return;
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    QJsonObject root;
-    QJsonObject defaults;
-    QJsonArray valid;
-
-    for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
-    {
-        const QString& flagName = it.key();
-        valid.append(flagName);
-    }
-
-    defaults["valid"] = valid;
-
-    QJsonObject exclusive;
-
-    auto addExclusive = [&exclusive](const QString& a, const QStringList& others)
-    {
-        QJsonArray arr;
-        for (const QString& o : others)
-            arr.append(o);
-        exclusive.insert(a, arr);
-    };
-
-    if (m_controlFlags.contains("EBS_LEFT") &&
-        m_controlFlags.contains("EBS_CENTER") &&
-        m_controlFlags.contains("EBS_RIGHT"))
-    {
-        addExclusive("EBS_LEFT",   {"EBS_CENTER", "EBS_RIGHT"});
-        addExclusive("EBS_CENTER", {"EBS_LEFT",   "EBS_RIGHT"});
-        addExclusive("EBS_RIGHT",  {"EBS_LEFT",   "EBS_CENTER"});
-    }
-
-    if (m_controlFlags.contains("ES_LEFT") &&
-        m_controlFlags.contains("ES_CENTER") &&
-        m_controlFlags.contains("ES_RIGHT"))
-    {
-        addExclusive("ES_LEFT",   {"ES_CENTER", "ES_RIGHT"});
-        addExclusive("ES_CENTER", {"ES_LEFT",   "ES_RIGHT"});
-        addExclusive("ES_RIGHT",  {"ES_LEFT",   "ES_CENTER"});
-    }
-
-    if (m_controlFlags.contains("SS_LEFT") &&
-        m_controlFlags.contains("SS_CENTER") &&
-        m_controlFlags.contains("SS_RIGHT"))
-    {
-        addExclusive("SS_LEFT",   {"SS_CENTER", "SS_RIGHT"});
-        addExclusive("SS_CENTER", {"SS_LEFT",   "SS_RIGHT"});
-        addExclusive("SS_RIGHT",  {"SS_LEFT",   "SS_CENTER"});
-    }
-
-    if (!exclusive.isEmpty())
-        defaults["exclusive"] = exclusive;
-
-    root["Default"] = defaults;
-
-    backend.saveControlFlagRules(root);
-
-    qInfo().noquote()
-        << "[BehaviorManager] Default control_flag_rules.json generiert ("
-        << valid.size() << " Flags eingetragen ).";
-}
-
-// ----------------------------------------------------------
-// Rules laden + Cache bauen (ehemals reload*/rebuildValidFlagCache)
-// ----------------------------------------------------------
-void BehaviorManager::reloadWindowFlagRules()
-{
-    if (!m_layoutMgr) return;
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    m_windowRules = backend.loadWindowFlagRules();
+    m_windowRules = m_layoutBackend->loadWindowFlagRules();
     m_windowRulesLoaded = true;
-
-    if (m_windowRules.isEmpty())
-    {
-        qInfo() << "[BehaviorManager] Keine window_flag_rules gefunden – erstelle Defaults.";
-        generateDefaultWindowFlagRules();
-        m_windowRules = backend.loadWindowFlagRules();
-    }
 }
 
-void BehaviorManager::reloadControlFlagRules()
+void BehaviorManager::reloadControlFlagRules() const
 {
-    if (!m_layoutMgr) return;
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    m_controlRules = backend.loadControlFlagRules();
-    m_controlRulesLoaded = true;
-
-    if (m_controlRules.isEmpty())
-    {
-        qInfo() << "[BehaviorManager] Keine control_flag_rules gefunden – erstelle Defaults.";
-        generateDefaultControlFlagRules();
-        m_controlRules = backend.loadControlFlagRules();
+    if (!m_layoutBackend) {
+        qWarning() << "[BehaviorManager] Kein LayoutBackend – control_flag_rules.json kann nicht geladen werden.";
+        m_controlRules = QJsonObject{};
+        m_controlRulesLoaded = true;
+        return;
     }
+
+    m_controlRules = m_layoutBackend->loadControlFlagRules();
+    m_controlRulesLoaded = true;
 }
 
-QJsonObject BehaviorManager::getWindowFlagRules() const
+QJsonObject BehaviorManager::windowFlagRules() const
 {
     if (!m_windowRulesLoaded)
         const_cast<BehaviorManager*>(this)->reloadWindowFlagRules();
     return m_windowRules;
 }
 
-QJsonObject BehaviorManager::getControlFlagRules() const
+QJsonObject BehaviorManager::controlFlagRules() const
 {
     if (!m_controlRulesLoaded)
         const_cast<BehaviorManager*>(this)->reloadControlFlagRules();
     return m_controlRules;
 }
 
-void BehaviorManager::rebuildValidFlagCache()
+// ---------------------------------------------------------
+// Behavior-Konfiguration aus Datei (später erweiterbar)
+// ---------------------------------------------------------
+void BehaviorManager::reloadBehaviorConfig() const
 {
-    m_validFlagsByType.clear();
-
-    const auto addRules = [this](const QJsonObject& rules, const QString& prefix) {
-        for (auto it = rules.constBegin(); it != rules.constEnd(); ++it)
-        {
-            const QJsonObject obj = it.value().toObject();
-            const QJsonArray valid = obj.value("valid").toArray();
-            if (valid.isEmpty())
-                continue;
-
-            QSet<QString> entries;
-            for (const auto& v : valid)
-                entries.insert(v.toString());
-
-            if (!entries.isEmpty())
-                m_validFlagsByType.insert(prefix + it.key(), entries);
-        }
-    };
-
-    addRules(getWindowFlagRules(), QStringLiteral("window:"));
-    addRules(getControlFlagRules(), QStringLiteral("control:"));
+    // Aktuell noch kein Backend-Call – Platzhalter.
+    // Später: m_behaviorConfig = m_layoutBackend->loadBehaviorConfig();
+    m_behaviorConfig = QJsonObject{};
+    m_behaviorConfigLoaded = true;
 }
 
-// ----------------------------------------------------------
-// Allowed-Flags für Window/Control-Typen
-// ----------------------------------------------------------
-QSet<QString> BehaviorManager::allowedWindowFlags(const QString& typeName) const
+// ---------------------------------------------------------
+// Masken → resolvedMask aktualisieren
+// ---------------------------------------------------------
+void BehaviorManager::updateWindowFlags(const std::shared_ptr<WindowData>& wnd) const
 {
-    if (m_validFlagsByType.isEmpty())
-        const_cast<BehaviorManager*>(this)->rebuildValidFlagCache();
-
-    if (m_validFlagsByType.isEmpty())
-        return {};
-
-    const QString directKey  = QStringLiteral("window:%1").arg(typeName);
-    const QString defaultKey = QStringLiteral("window:Default");
-
-    if (m_validFlagsByType.contains(directKey))
-        return m_validFlagsByType.value(directKey);
-
-    return m_validFlagsByType.value(defaultKey);
-}
-
-QSet<QString> BehaviorManager::allowedControlFlags(const QString& typeName) const
-{
-    if (m_validFlagsByType.isEmpty())
-        const_cast<BehaviorManager*>(this)->rebuildValidFlagCache();
-
-    if (m_validFlagsByType.isEmpty())
-        return {};
-
-    const QString directKey  = QStringLiteral("control:%1").arg(typeName);
-    const QString defaultKey = QStringLiteral("control:Default");
-
-    if (m_validFlagsByType.contains(directKey))
-        return m_validFlagsByType.value(directKey);
-
-    return m_validFlagsByType.value(defaultKey);
-}
-
-// ----------------------------------------------------------
-// Unknown Control Bits (ehemals generateUnknownControls)
-// ----------------------------------------------------------
-void BehaviorManager::generateUnknownControls(const std::vector<std::shared_ptr<WindowData>>& windows)
-{
-    if (!m_layoutMgr) return;
-    LayoutBackend& backend = m_layoutMgr->backend();
-
-    m_unknownControlBits.clear();
-
-    if (windows.empty() || m_controlFlags.isEmpty()) {
-        backend.saveUndefinedControlFlags(QJsonObject{});
+    if (!wnd)
         return;
+
+    wnd->resolvedMask.clear();
+    for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it) {
+        if (wnd->flagsMask & it.value())
+            wnd->resolvedMask << it.key();
+    }
+}
+
+void BehaviorManager::updateControlFlags(const std::shared_ptr<ControlData>& ctrl) const
+{
+    if (!ctrl)
+        return;
+
+    ctrl->resolvedMask.clear();
+    for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it) {
+        if (ctrl->flagsMask & it.value())
+            ctrl->resolvedMask << it.key();
+    }
+}
+
+// ---------------------------------------------------------
+// Validierung – aktuell sehr einfach, kann später ausgebaut werden
+// ---------------------------------------------------------
+void BehaviorManager::validateWindowFlags(WindowData* wnd) const
+{
+    if (!wnd)
+        return;
+
+    // Beispiel: ungültige Bits löschen
+    quint32 knownMask = 0;
+    for (auto it = m_windowFlags.constBegin(); it != m_windowFlags.constEnd(); ++it)
+        knownMask |= it.value();
+
+    if ((wnd->flagsMask & ~knownMask) != 0) {
+        qWarning().noquote()
+        << "[BehaviorManager] Window" << wnd->name
+        << "enthält unbekannte Flagbits:"
+        << QString("0x%1").arg(wnd->flagsMask & ~knownMask, 0, 16);
     }
 
-    quint32 knownBits = 0;
+    // resolvedMask im Anschluss neu aufbauen
+    std::shared_ptr<WindowData> shared; // nur für updateWindowFlags-API
+    // Hinweis: In deinem Code nutzt du normalerweise shared_ptr,
+    // hier ruft LayoutManager::processLayout() die Validierung
+    // mit raw-Pointern. Wenn du willst, kannst du updateWindowFlags
+    // an raw-Pointer overloaden. Fürs Erste lassen wir es hier minimal.
+}
+
+void BehaviorManager::validateControlFlags(ControlData* ctrl) const
+{
+    if (!ctrl)
+        return;
+
+    quint32 knownMask = 0;
     for (auto it = m_controlFlags.constBegin(); it != m_controlFlags.constEnd(); ++it)
-        knownBits |= it.value();
+        knownMask |= it.value();
 
-    for (const auto& wnd : windows)
-    {
-        if (!wnd)
-            continue;
+    if ((ctrl->flagsMask & ~knownMask) != 0) {
+        qWarning().noquote()
+        << "[BehaviorManager] Control" << ctrl->id
+        << "enthält unbekannte Flagbits:"
+        << QString("0x%1").arg(ctrl->flagsMask & ~knownMask, 0, 16);
+    }
+}
 
-        for (const auto& ctrl : wnd->controls)
-        {
-            if (!ctrl)
-                continue;
+void BehaviorManager::analyzeControlTypes(const std::vector<std::shared_ptr<WindowData>>& windows) const
+{
+    Q_UNUSED(windows);
+    // Hier könntest du z.B. Statistiken sammeln,
+    // welche Controls es mit welchen Typen/Flags gibt.
+}
 
-            const quint32 ctrlLow = ctrl->flagsMask & 0x0000FFFF;
+void BehaviorManager::generateUnknownControls(const std::vector<std::shared_ptr<WindowData>>& windows) const
+{
+    Q_UNUSED(windows);
+    // Optional: "Unknown" Controls in Listen sammeln,
+    // um sie im Editor speziell darzustellen.
+}
 
-            if (ctrlLow == 0)
-                continue;
+// ---------------------------------------------------------
+// Behavior-API – BaseBehavior + optionale Config
+// ---------------------------------------------------------
+BehaviorInfo BehaviorManager::resolveBehavior(const ControlData& ctrl) const
+{
+    BehaviorInfo info;
 
-            const quint32 unknownMask = ctrlLow & ~knownBits;
-            if (unknownMask == 0u)
-                continue;
-
-            const QString maskHex = QStringLiteral("0x%1").arg(unknownMask, 0, 16).toUpper();
-            QString identifier = ctrl->id;
-            if (identifier.isEmpty())
-                identifier = ctrl->rawHeader.trimmed();
-            if (identifier.isEmpty())
-                identifier = QStringLiteral("[%1/%2]").arg(wnd->name).arg(ctrl->type);
-
-            m_unknownControlBits[ctrl->type][maskHex].insert(identifier);
-        }
+    // 1️⃣ BaseBehavior
+    BaseBehavior base;
+    bool hasBase = m_baseBehaviors.contains(ctrl.type);
+    if (hasBase) {
+        base = m_baseBehaviors.value(ctrl.type);
+        info.category = base.category;
+        for (auto it = base.defaults.constBegin(); it != base.defaults.constEnd(); ++it)
+            info.attributes.insert(it.key(), it.value());
+    } else {
+        info.category = "unknown";
     }
 
-    if (m_unknownControlBits.isEmpty()) {
-        backend.saveUndefinedControlFlags(QJsonObject{});
-        return;
+    // Capabilities in eine einfache Liste schreiben (gut für Debug/UI)
+    QStringList capsList;
+    if (hasBase) {
+        ControlCapabilities caps = base.capabilities;
+        if (caps.testFlag(ControlCapability_CanClick))       capsList << "CanClick";
+        if (caps.testFlag(ControlCapability_CanToggle))      capsList << "CanToggle";
+        if (caps.testFlag(ControlCapability_CanFocus))       capsList << "CanFocus";
+        if (caps.testFlag(ControlCapability_CanTextInput))   capsList << "CanTextInput";
+        if (caps.testFlag(ControlCapability_CanSelectItems)) capsList << "CanSelectItems";
+        if (caps.testFlag(ControlCapability_CanScroll))      capsList << "CanScroll";
+        if (caps.testFlag(ControlCapability_IsContainer))    capsList << "IsContainer";
+        if (caps.testFlag(ControlCapability_HasTooltip))     capsList << "HasTooltip";
+        if (caps.testFlag(ControlCapability_CustomBehavior)) capsList << "CustomBehavior";
+    }
+    info.attributes["capabilities"] = capsList;
+
+    // 2️⃣ Behavior-Config aus Datei (noch leer, aber erweiterbar)
+    if (!m_behaviorConfigLoaded)
+        const_cast<BehaviorManager*>(this)->reloadBehaviorConfig();
+
+    if (m_behaviorConfig.contains(ctrl.type)) {
+        QJsonObject obj = m_behaviorConfig.value(ctrl.type).toObject();
+        for (auto it = obj.begin(); it != obj.end(); ++it)
+            info.attributes[it.key()] = it.value().toVariant();
     }
 
-    QJsonObject root;
-    for (auto typeIt = m_unknownControlBits.cbegin(); typeIt != m_unknownControlBits.cend(); ++typeIt)
-    {
-        QJsonArray entries;
-        for (auto maskIt = typeIt.value().cbegin(); maskIt != typeIt.value().cend(); ++maskIt)
-        {
-            QJsonObject entry;
-            entry.insert("mask", maskIt.key());
-            QJsonArray controls;
-            for (const auto& id : maskIt.value())
-                controls.append(id);
-            entry.insert("controls", controls);
-            entries.append(entry);
-        }
-        root.insert(typeIt.key(), entries);
-    }
+    // 3️⃣ Laufzeitabhängige Informationen / Flags
+    info.attributes["id"]      = ctrl.id;
+    info.attributes["type"]    = ctrl.type;
+    info.attributes["color"]   = ctrl.color;
+    info.attributes["enabled"] = true;   // später aus Flags ableiten
+    info.attributes["visible"] = true;   // ebenfalls aus Flags ableitbar
 
-    if (!backend.saveUndefinedControlFlags(root))
-        qWarning().noquote() << "[BehaviorManager] Konnte undefined_control_flags.json nicht aktualisieren.";
+    return info;
+}
+
+// ---------------------------------------------------------
+// Defaults anwenden (optional)
+// ---------------------------------------------------------
+void BehaviorManager::applyBehavior(ControlData& ctrl) const
+{
+    Q_UNUSED(ctrl);
+    // Hier könntest du später z.B. defaultColor, TextAlign, etc.
+    // tatsächlich in ControlData zurückschreiben.
 }

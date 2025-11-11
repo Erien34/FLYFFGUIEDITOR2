@@ -42,7 +42,8 @@ ProjectController::ProjectController(QObject* parent)
         m_flagManager.get(),
         m_textManager.get(),
         m_defineManager.get(),
-        m_layoutManager.get()))
+        m_layoutManager.get(),
+        m_layoutBackend.get()))
 
 
 {
