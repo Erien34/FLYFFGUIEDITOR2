@@ -154,47 +154,50 @@ void drawNineSlice(QPainter& p, const QRect& rect,
 // ======================================================
 // Hilfsfunktion: Control-State-Texturen laden (FlyFF-Stil)
 // ======================================================
-ControlStates loadControlStates(const QMap<QString, QPixmap>& themes,
-                                const QString& baseKey)
+// ======================================================
+// Hilfsfunktion: Textur-Stages aus Spritesheet extrahieren
+// ======================================================
+static TextureStates loadTextureStages(const QMap<QString, QPixmap>& themes,
+                                       const QString& baseKey)
 {
-    ControlStates states;
+    TextureStates stages;
 
     QString key = ResourceUtils::findTextureKey(themes, baseKey);
     if (key.isEmpty() || !themes.contains(key))
-        return states;
+        return stages;
 
     const QPixmap& src = themes[key];
     if (src.isNull())
-        return states;
+        return stages;
 
     const int w = src.width();
     const int h = src.height();
 
-    // 4 States nebeneinander (Normal / Hover / Pressed / Disabled)
+    // 🔹 4 States nebeneinander (Normal / Hover / Pressed / Disabled)
     if (w >= h * 4) {
         const int frameW = w / 4;
-        states.normal   = src.copy(0 * frameW, 0, frameW, h);
-        states.hover    = src.copy(1 * frameW, 0, frameW, h);
-        states.pressed  = src.copy(2 * frameW, 0, frameW, h);
-        states.disabled = src.copy(3 * frameW, 0, frameW, h);
+        stages.normal   = src.copy(0 * frameW, 0, frameW, h);
+        stages.hover    = src.copy(1 * frameW, 0, frameW, h);
+        stages.pressed  = src.copy(2 * frameW, 0, frameW, h);
+        stages.disabled = src.copy(3 * frameW, 0, frameW, h);
     }
-    // 4 States untereinander (vertikal)
+    // 🔹 4 States untereinander (vertikal)
     else if (h >= w * 4) {
         const int frameH = h / 4;
-        states.normal   = src.copy(0, 0 * frameH, w, frameH);
-        states.hover    = src.copy(0, 1 * frameH, w, frameH);
-        states.pressed  = src.copy(0, 2 * frameH, w, frameH);
-        states.disabled = src.copy(0, 3 * frameH, w, frameH);
+        stages.normal   = src.copy(0, 0 * frameH, w, frameH);
+        stages.hover    = src.copy(0, 1 * frameH, w, frameH);
+        stages.pressed  = src.copy(0, 2 * frameH, w, frameH);
+        stages.disabled = src.copy(0, 3 * frameH, w, frameH);
     }
     else {
-        // Einzelbild → auf alle States anwenden
-        states.normal = src;
-        states.hover = src;
-        states.pressed = src;
-        states.disabled = src;
+        // 🔹 Einzelbild → auf alle States anwenden
+        stages.normal   = src;
+        stages.hover    = src;
+        stages.pressed  = src;
+        stages.disabled = src;
     }
 
-    return states;
+    return stages;
 }
 
 // ======================================================
@@ -303,7 +306,8 @@ void renderVerticalScrollBar(QPainter& p, const QRect& rect,
 // =====================================================
 void renderEdit(QPainter& p, const QRect& rect,
                 const std::shared_ptr<ControlData>& ctrl,
-                const QMap<QString, QPixmap>& themes)
+                const QMap<QString, QPixmap>& themes,
+                ControlState state)
 {
     // 1️⃣ Hintergrund auslagern
     renderEditBackground(p, rect, themes);
@@ -317,7 +321,8 @@ void renderEdit(QPainter& p, const QRect& rect,
 // ================================================================
 void renderText(QPainter& p, const QRect& rect,
                 const std::shared_ptr<ControlData>& ctrl,
-                const QMap<QString, QPixmap>& themes)
+                const QMap<QString, QPixmap>& themes,
+                ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.setOpacity(FLYFF_WINDOW_ALPHA_LOCAL);
@@ -339,7 +344,8 @@ void renderText(QPainter& p, const QRect& rect,
 // Standard Buttons
 void renderStandardButton(QPainter& p, const QRect& rect,
                           const std::shared_ptr<ControlData>& ctrl,
-                          const QMap<QString, QPixmap>& themes)
+                          const QMap<QString, QPixmap>& themes,
+                          ControlState state)
 {
     // 🔹 Transparenz & Blendmodus wie im FlyFF-Client
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
@@ -354,25 +360,32 @@ void renderStandardButton(QPainter& p, const QRect& rect,
         if (!foundKey.isEmpty()) {
             QPixmap tex = themes.value(foundKey);
             if (!tex.isNull()) {
-                qDebug() << "[Render] Texture found:" << foundKey
-                         << "(" << tex.width() << "x" << tex.height() << ")";
 
-                int w = tex.width();
-                int h = tex.height();
-                const int slice = 6; // typischer FlyFF-Rand
+                // Schneide ggf. Multi-State-Textur in Frames
+                TextureStates stages = loadTextureStages(themes, ctrl->texture);
 
-                // Multi-State-Erkennung (4 States nebeneinander)
-                if (w >= h * 4) {
-                    w /= 4; // nur den ersten State (Normal) verwenden
-                    tex = tex.copy(0, 0, w, h);
-                    qDebug() << "[Render] Multi-state texture detected, using first slice (" << w << "x" << h << ")";
+                // Wähle richtigen Frame anhand State
+                QPixmap frame;
+                switch (state) {
+                case ControlState::Hover:    frame = stages.hover;    break;
+                case ControlState::Pressed:  frame = stages.pressed;  break;
+                case ControlState::Disabled: frame = stages.disabled; break;
+                default:                     frame = stages.normal;   break;
                 }
+
+                if (frame.isNull()) {
+                    frame = tex; // Fallback: ganze Textur
+                }
+
+                const int slice = 6; // typischer FlyFF-Rand
+                int w = frame.width();
+                int h = frame.height();
 
                 // 3-Slice horizontaler Button (linke/mittlere/rechte Zone)
                 if (w > slice * 2) {
-                    QPixmap left  = tex.copy(0, 0, slice, h);
-                    QPixmap mid   = tex.copy(slice, 0, w - slice * 2, h);
-                    QPixmap right = tex.copy(w - slice, 0, slice, h);
+                    QPixmap left  = frame.copy(0, 0, slice, h);
+                    QPixmap mid   = frame.copy(slice, 0, w - slice * 2, h);
+                    QPixmap right = frame.copy(w - slice, 0, slice, h);
 
                     // Zeichnen
                     p.drawPixmap(rect.left(), rect.top(), left);
@@ -381,10 +394,11 @@ void renderStandardButton(QPainter& p, const QRect& rect,
                     p.drawPixmap(rect.right() - slice + 1, rect.top(), right);
                 } else {
                     // Einfache Textur – direkt skalieren
-                    p.drawPixmap(rect, tex.scaled(rect.size(),
-                                                  Qt::IgnoreAspectRatio,
-                                                  Qt::SmoothTransformation));
+                    p.drawPixmap(rect, frame.scaled(rect.size(),
+                                                    Qt::IgnoreAspectRatio,
+                                                    Qt::SmoothTransformation));
                 }
+
                 return;
             }
         }
@@ -402,13 +416,21 @@ void renderStandardButton(QPainter& p, const QRect& rect,
         return;
     }
 
-    // 3️⃣ Standard-State laden (normal)
-    ControlStates states = loadControlStates(themes, prefix + "00");
-    QPixmap buttonPixmap = states.normal;
-    if (!buttonPixmap.isNull()) {
-        p.drawPixmap(rect, buttonPixmap.scaled(rect.size(),
-                                               Qt::IgnoreAspectRatio,
-                                               Qt::SmoothTransformation));
+    // 3️⃣ Texturen für alle States laden
+    TextureStates states = loadTextureStages(themes, prefix + "00");
+
+    QPixmap frame;
+    switch (state) {
+    case ControlState::Hover:    frame = states.hover;    break;
+    case ControlState::Pressed:  frame = states.pressed;  break;
+    case ControlState::Disabled: frame = states.disabled; break;
+    default:                     frame = states.normal;   break;
+    }
+
+    if (!frame.isNull()) {
+        p.drawPixmap(rect, frame.scaled(rect.size(),
+                                        Qt::IgnoreAspectRatio,
+                                        Qt::SmoothTransformation));
         qDebug() << "[Render] Prefix-basierten Button gezeichnet:" << prefix;
     } else {
         qDebug() << "[Render] Button-Fallback gezeichnet (fehlende Textur)";
@@ -421,7 +443,8 @@ void renderStandardButton(QPainter& p, const QRect& rect,
 // ================================================================
 void renderCheckButton(QPainter& p, const QRect& rect,
                        const std::shared_ptr<ControlData>& ctrl,
-                       const QMap<QString, QPixmap>& themes)
+                       const QMap<QString, QPixmap>& themes,
+                       ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.setOpacity(FLYFF_WINDOW_ALPHA_LOCAL);
@@ -499,7 +522,8 @@ void renderCheckButton(QPainter& p, const QRect& rect,
 // ================================================================
 void renderRadioButton(QPainter& p, const QRect& rect,
                        const std::shared_ptr<ControlData>& ctrl,
-                       const QMap<QString, QPixmap>& themes)
+                       const QMap<QString, QPixmap>& themes,
+                       ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.setOpacity(FLYFF_WINDOW_ALPHA_LOCAL);
@@ -577,7 +601,8 @@ void renderRadioButton(QPainter& p, const QRect& rect,
 // ================================================================
 void renderStatic(QPainter& p, const QRect& rect,
                   const std::shared_ptr<ControlData>& ctrl,
-                  const QMap<QString, QPixmap>& themes)
+                  const QMap<QString, QPixmap>& themes,
+                  ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.setOpacity(FLYFF_WINDOW_ALPHA_LOCAL);
@@ -625,7 +650,8 @@ void renderStatic(QPainter& p, const QRect& rect,
 // ================================================================
 void renderGroupBox(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes)
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.setOpacity(FLYFF_WINDOW_ALPHA_LOCAL);
@@ -667,7 +693,8 @@ void renderGroupBox(QPainter& p, const QRect& rect,
 // ================================================================
 void renderComboBox(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes)
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state)
 {
     Q_UNUSED(ctrl);
 
@@ -705,7 +732,8 @@ void renderComboBox(QPainter& p, const QRect& rect,
 // ================================================================
 void renderHorizontalTabCtrl(QPainter& p, const QRect& rect,
                              const std::shared_ptr<ControlData>& ctrl,
-                             const QMap<QString, QPixmap>& themes)
+                             const QMap<QString, QPixmap>& themes,
+                             ControlState state)
 {
     Q_UNUSED(ctrl);
 
@@ -815,7 +843,8 @@ void renderHorizontalTabCtrl(QPainter& p, const QRect& rect,
 
 void renderVerticalTabCtrl(QPainter& p, const QRect& rect,
                            const std::shared_ptr<ControlData>& ctrl,
-                           const QMap<QString, QPixmap>& themes)
+                           const QMap<QString, QPixmap>& themes,
+                           ControlState state)
 {
     Q_UNUSED(ctrl);
 
@@ -950,13 +979,14 @@ void renderVerticalTabCtrl(QPainter& p, const QRect& rect,
 // ================================================================
 void renderTabCtrl(QPainter& p, const QRect& rect,
                    const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes)
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state)
 {
     bool isVertical = rect.height() > rect.width();
     if (isVertical)
-        renderVerticalTabCtrl(p, rect, ctrl, themes);
+        renderVerticalTabCtrl(p, rect, ctrl, themes, state);
     else
-        renderHorizontalTabCtrl(p, rect, ctrl, themes);
+        renderHorizontalTabCtrl(p, rect, ctrl, themes, state);
 }
 
 // ================================================================
@@ -964,7 +994,8 @@ void renderTabCtrl(QPainter& p, const QRect& rect,
 // ================================================================
 void renderListBox(QPainter& p, const QRect& rect,
                    const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes)
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state)
 {
     Q_UNUSED(ctrl);
 
@@ -991,7 +1022,8 @@ void renderListBox(QPainter& p, const QRect& rect,
 // =====================================================
 void renderTreeCtrl(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes)
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state)
 {
     constexpr qreal FLYFF_WINDOW_ALPHA_LOCAL = 200.0 / 255.0;
     p.save();
@@ -1022,18 +1054,22 @@ void renderTreeCtrl(QPainter& p, const QRect& rect,
 // =====================================================
 void renderControl(QPainter& p, const QRect& rect,
                    const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes)
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state = ControlState::Normal)
 {
     if (!ctrl) return;
 
     const QString type   = ctrl->type.toUpper();
     const QString texKey = ctrl->texture.toLower();
 
-    //qDebug() << "[RenderControl]" << ctrl->id << "Type:" << type << "Texture:" << texKey;
+    p.save();
+    p.fillRect(rect.adjusted(2, 2, -2, -2), QColor(255, 0, 0, 60));
+    p.restore();
+    qDebug() << "[RenderControl]" << ctrl->id << "Type:" << type << "Texture:" << texKey;
 
     // 1️⃣ Edit – Speziallogik
     if (type.contains("EDIT")) {
-        renderEdit(p, rect, ctrl, themes);
+        renderEdit(p, rect, ctrl, themes, state);
         return;
     }
 
@@ -1042,63 +1078,63 @@ void renderControl(QPainter& p, const QRect& rect,
 
         // ✅ Check-Button
         if (texKey.contains("buttcheck") || type.contains("CHECK")) {
-            renderCheckButton(p, rect, ctrl, themes);
+            renderCheckButton(p, rect, ctrl, themes, state);
             return;
         }
 
         // ✅ Radio-Button
         if (texKey.contains("buttradio") || type.contains("RADIO")) {
-            renderRadioButton(p, rect, ctrl, themes);
+            renderRadioButton(p, rect, ctrl, themes, state);
             return;
         }
 
         // ✅ Normaler Button
-        renderStandardButton(p, rect, ctrl, themes);
+        renderStandardButton(p, rect, ctrl, themes, state);
         return;
     }
 
     // ComboBox
     if (type.contains("COMBO")) {
-        renderComboBox(p, rect, ctrl, themes);
+        renderComboBox(p, rect, ctrl, themes, state);
         return;
     }
 
     // Static
     if (type.contains("STATIC")) {
-        renderStatic(p, rect, ctrl, themes);
+        renderStatic(p, rect, ctrl, themes, state);
         return;
     }
 
     // Text
     if (type.contains("TEXT")) {
-        renderText(p, rect, ctrl, themes);
+        renderText(p, rect, ctrl, themes, state);
         return;
     }
 
     // Tab Controls
     if (type.contains("TABCTRL")) {
         if (rect.width() >= rect.height())
-            renderHorizontalTabCtrl(p, rect, ctrl, themes);
+            renderHorizontalTabCtrl(p, rect, ctrl, themes, state);
         else
-            renderVerticalTabCtrl(p, rect, ctrl, themes);
+            renderVerticalTabCtrl(p, rect, ctrl, themes, state);
         return;
     }
 
     // Listbox
     if (type.contains("LISTBOX")) {
-        renderListBox(p, rect, ctrl, themes);
+        renderListBox(p, rect, ctrl, themes, state);
         return;
     }
 
     // Groupbox
     if (type.contains("GROUPBOX")) {
-        renderGroupBox(p, rect, ctrl, themes);
+        renderGroupBox(p, rect, ctrl, themes, state);
         return;
     }
 
     // 5️⃣ TreeCtrl
     if (type.contains("TREECTRL")) {
-        renderTreeCtrl(p, rect, ctrl, themes);
+        renderTreeCtrl(p, rect, ctrl, themes, state);
         return;
     }
 

@@ -53,4 +53,8 @@ struct ControlData
 
     quint32 flagsMask = 0;             // Effektive Bitmaske
     QVector<QString> resolvedMask;     // Einzel gesetzte Flags
+
+    bool disabled = false;
+    bool isPressed = false;
+    bool isHovered = false;
 };

@@ -7,27 +7,25 @@
 #include <memory>
 
 #include "layout/model/ControlData.h"
+#include "renderer/ControlState.h"
 
-// Forward-Decl (kommt aus BehaviorManager.h)
-struct BehaviorInfo;
 
-// =====================================================
-//  RenderControls – Renderer-Klasse für FlyFF-Controls
-// =====================================================
-class RenderControls
+struct TextureStates
 {
-public:
-    RenderControls() = default;
+    QPixmap normal;
+    QPixmap hover;
+    QPixmap pressed;
+    QPixmap disabled;
+};
 
-    // Haupt-Dispatcher für ein einzelnes Control
-    // behavior kann später genutzt werden (Capabilities, States, etc.),
-    // aktuell wird es noch nicht ausgewertet.
-    void renderControl(QPainter& p,
-                       const QRect& rect,
-                       const std::shared_ptr<ControlData>& ctrl,
-                       const QMap<QString, QPixmap>& themes,
-                       const BehaviorInfo* behavior = nullptr);
+// Alle Deklarationen im Namespace – passend zu deiner .cpp
+namespace RenderControls {
 
+// Haupt-Dispatcher für ein einzelnes Control
+void renderControl(QPainter& p, const QRect& rect,
+                   const std::shared_ptr<ControlData>& ctrl,
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state);
 
 // =====================================================
 //  🔹 Hilfsfunktionen
@@ -47,56 +45,67 @@ void renderVerticalScrollBar(QPainter& p, const QRect& rect,
 // =====================================================
 void renderEdit(QPainter& p, const QRect& rect,
                 const std::shared_ptr<ControlData>& ctrl,
-                const QMap<QString, QPixmap>& themes);
+                const QMap<QString, QPixmap>& themes,
+                ControlState state = ControlState::Normal);
 
 void renderText(QPainter& p, const QRect& rect,
                 const std::shared_ptr<ControlData>& ctrl,
-                const QMap<QString, QPixmap>& themes);
+                const QMap<QString, QPixmap>& themes,
+                ControlState state = ControlState::Normal);
 
 void renderStandardButton(QPainter& p, const QRect& rect,
                           const std::shared_ptr<ControlData>& ctrl,
-                          const QMap<QString, QPixmap>& themes);
+                          const QMap<QString, QPixmap>& themes,
+                          ControlState state = ControlState::Normal);
 
 void renderCheckButton(QPainter& p, const QRect& rect,
                        const std::shared_ptr<ControlData>& ctrl,
-                       const QMap<QString, QPixmap>& themes);
+                       const QMap<QString, QPixmap>& themes,
+                       ControlState state = ControlState::Normal);
 
 void renderRadioButton(QPainter& p, const QRect& rect,
                        const std::shared_ptr<ControlData>& ctrl,
-                       const QMap<QString, QPixmap>& themes);
+                       const QMap<QString, QPixmap>& themes,
+                       ControlState state = ControlState::Normal);
 
 void renderStatic(QPainter& p, const QRect& rect,
                   const std::shared_ptr<ControlData>& ctrl,
-                  const QMap<QString, QPixmap>& themes);
+                  const QMap<QString, QPixmap>& themes,
+                  ControlState state = ControlState::Normal);
 
 void renderGroupBox(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes);
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state = ControlState::Normal);
 
 void renderComboBox(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes);
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state = ControlState::Normal);
 
 void renderHorizontalTabCtrl(QPainter& p, const QRect& rect,
                              const std::shared_ptr<ControlData>& ctrl,
-                             const QMap<QString, QPixmap>& themes);
+                             const QMap<QString, QPixmap>& themes,
+                             ControlState state = ControlState::Normal);
 
 void renderVerticalTabCtrl(QPainter& p, const QRect& rect,
                            const std::shared_ptr<ControlData>& ctrl,
-                           const QMap<QString, QPixmap>& themes);
+                           const QMap<QString, QPixmap>& themes,
+                           ControlState state = ControlState::Normal);
 
 void renderTabCtrl(QPainter& p, const QRect& rect,
                    const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes);
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state = ControlState::Normal);
 
 void renderListBox(QPainter& p, const QRect& rect,
                    const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes);
+                   const QMap<QString, QPixmap>& themes,
+                   ControlState state = ControlState::Normal);
 
 void renderTreeCtrl(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
-                    const QMap<QString, QPixmap>& themes);
+                    const QMap<QString, QPixmap>& themes,
+                    ControlState state = ControlState::Normal);
 
-};
-
-
+} // namespace RenderControls

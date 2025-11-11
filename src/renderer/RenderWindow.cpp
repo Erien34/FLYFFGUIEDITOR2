@@ -7,7 +7,7 @@
 namespace RenderWindow {
 
 // =========================================================
-// Fenster komplett zeichnen
+// Fenster komplett zeichnen (ohne Controls)
 // =========================================================
 void renderWindow(QPainter& p,
                   const std::shared_ptr<WindowData>& wnd,
@@ -17,12 +17,11 @@ void renderWindow(QPainter& p,
     if (!wnd) return;
 
     QRect wndRect(0, 0, wnd->width, wnd->height);
-    QPoint center(p.device()->width() / 2 - wndRect.width() / 2,
-                  p.device()->height() / 2 - wndRect.height() / 2);
+    QPoint center(canvasSize.width()  / 2 - wndRect.width()  / 2,
+                  canvasSize.height() / 2 - wndRect.height() / 2);
     wndRect.moveTopLeft(center);
 
     drawWindowTiles(p, wndRect, themes);
-    drawWindowControls(p, wnd, themes);
 
     // Fenster-Titel
     QRect titleBar = QRect(wndRect.left(), wndRect.top() + 4, wndRect.width(), 24);
@@ -105,37 +104,6 @@ void drawWindowTiles(QPainter& p, const QRect& area,
         p.drawPixmap(QPoint(area.right() - t11.width() + 1, bottomY), t11);
 
     p.restore();
-}
-
-// =========================================================
-// Controls innerhalb eines Fensters rendern
-// =========================================================
-void drawWindowControls(QPainter& p, const std::shared_ptr<WindowData>& wnd,
-                        const QMap<QString, QPixmap>& themes)
-{
-    if (!wnd) return;
-
-    QRect wndRect(0, 0, wnd->width, wnd->height);
-    QPoint wndPos(p.device()->width() / 2 - wndRect.width() / 2,
-                  p.device()->height() / 2 - wndRect.height() / 2);
-    wndRect.moveTopLeft(wndPos);
-
-    QRect client = getClientRect(wnd, themes);
-
-    for (const auto& ctrl : wnd->controls)
-    {
-        if (!ctrl) continue;
-
-        QRect rect(ctrl->x1 + wndRect.x() + client.left(),
-                   ctrl->y1 + wndRect.y() + client.top(),
-                   ctrl->x2 - ctrl->x1,
-                   ctrl->y2 - ctrl->y1);
-
-        rect = rect.intersected(wndRect.adjusted(0, 0, -1, -1));
-        if (rect.isEmpty()) continue;
-
-        RenderControls::renderControl(p, rect, ctrl, themes);
-    }
 }
 
 // =========================================================

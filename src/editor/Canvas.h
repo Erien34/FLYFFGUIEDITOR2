@@ -6,6 +6,7 @@
 
 class ProjectController;
 class LayoutManager;
+class GuiRenderer;   // NEU
 
 enum class RenderMode {
     ActiveOnly,
@@ -31,6 +32,8 @@ private:
     LayoutManager*                  m_layoutManager = nullptr;
     std::shared_ptr<WindowData>     m_activeWindow;
     RenderMode                      m_renderMode = RenderMode::ActiveOnly;
+
+    std::unique_ptr<GuiRenderer>    m_renderer;   // NEU
 
     void drawBackground(QPainter& p);
 };

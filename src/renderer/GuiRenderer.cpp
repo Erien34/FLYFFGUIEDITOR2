@@ -1,10 +1,16 @@
-#include "GuiRenderer.h"
+#include "renderer/GuiRenderer.h"
+
+#include "renderer/RenderWindow.h"
+#include "renderer/RenderControls.h"
 #include <QDebug>
 
-GuiRenderer::GuiRenderer(BehaviorManager* behaviorMgr)
-    : m_behaviorMgr(behaviorMgr)
+GuiRenderer::GuiRenderer(BehaviorManager* behaviorMgr, QObject* parent)
+    : QObject(parent),
+    m_behaviorMgr(behaviorMgr)
 {
-    Q_ASSERT(m_behaviorMgr);
+    if (!m_behaviorMgr) {
+        qInfo() << "[GuiRenderer] BehaviorManager ist null – Behaviors aktuell inaktiv.";
+    }
 }
 
 void GuiRenderer::setThemeColor(const QColor& accent)
@@ -16,80 +22,111 @@ void GuiRenderer::setThemeColor(const QColor& accent)
 // Gesamtes Layout rendern (alle Fenster & Controls)
 // ------------------------------------------------------------
 void GuiRenderer::render(QPainter& painter,
-                         const std::vector<std::shared_ptr<WindowData>>& windows)
+                         const std::vector<std::shared_ptr<WindowData>>& windows,
+                         const QMap<QString, QPixmap>& themes,
+                         const QSize& canvasSize)
 {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
     for (const auto& wnd : windows)
     {
         if (!wnd || !wnd->valid)
-            continue; // überspringe ungültige Fenster
+            continue;
 
-        renderWindow(painter, wnd);
+        renderWindow(painter, wnd, themes, canvasSize);
     }
 
     painter.restore();
 }
 
 // ------------------------------------------------------------
-// Einzelnes Fenster zeichnen (inkl. Controls)
+// Einzelnes Fenster (Rahmen + Controls)
 // ------------------------------------------------------------
 void GuiRenderer::renderWindow(QPainter& p,
-                               const std::shared_ptr<WindowData>& wnd)
+                               const std::shared_ptr<WindowData>& wnd,
+                               const QMap<QString, QPixmap>& themes,
+                               const QSize& canvasSize)
 {
-    // Fenster selbst rendern
-    m_windowRenderer.renderWindow(p, *wnd);
+    if (!wnd)
+        return;
 
-    // Alle Controls dieses Fensters zeichnen
+    // 1️⃣ Fensterrahmen + Titel zeichnen
+    RenderWindow::renderWindow(p, wnd, themes, canvasSize);
+
+    // 2️⃣ Fensterposition auf Canvas bestimmen (zentriert)
+    QRect wndRect(0, 0, wnd->width, wnd->height);
+    QPoint center(canvasSize.width()  / 2 - wndRect.width()  / 2,
+                  canvasSize.height() / 2 - wndRect.height() / 2);
+    wndRect.moveTopLeft(center);
+
+    // 3️⃣ ClientRect (Innenraum) vom Fenster holen
+    QRect client = RenderWindow::getClientRect(wnd, themes);
+
+    // 4️⃣ Controls des Fensters zeichnen
     for (const auto& ctrl : wnd->controls)
     {
         if (!ctrl || !ctrl->valid)
             continue;
 
-        renderControl(p, ctrl);
+        QRect rect(ctrl->x1 + wndRect.x() + client.left(),
+                   ctrl->y1 + wndRect.y() + client.top(),
+                   ctrl->x2 - ctrl->x1,
+                   ctrl->y2 - ctrl->y1);
+
+        // Clipping auf Fensterbereich
+        rect = rect.intersected(wndRect.adjusted(0, 0, -1, -1));
+        if (rect.isEmpty())
+            continue;
+
+        renderControl(p, ctrl, rect, themes);
     }
 }
 
 // ------------------------------------------------------------
-// Einzelnes Control zeichnen (inkl. State + Theme)
+// Einzelnes Control zeichnen (Platz für Behavior/State)
 // ------------------------------------------------------------
 void GuiRenderer::renderControl(QPainter& p,
-                                const std::shared_ptr<ControlData>& ctrl)
+                                const std::shared_ptr<ControlData>& ctrl,
+                                const QRect& rect,
+                                const QMap<QString, QPixmap>& themes)
 {
-    BehaviorInfo info = m_behaviorMgr->resolveBehavior(*ctrl);
+    if (!ctrl)
+        return;
+
+    // 🔹 später: Behaviors auswerten
+    Q_UNUSED(m_behaviorMgr);
+
     ControlState state = stateFor(ctrl);
+    Q_UNUSED(state); // aktuell noch nicht genutzt
 
-    QColor drawColor = ctrl->color.isValid()
-                           ? ctrl->color
-                           : QColor(255, 255, 255);
-
-    // einfache Farbvariation nach State
-    switch (state) {
-    case ControlState::Hover:
-        drawColor = drawColor.lighter(115);
-        break;
-    case ControlState::Pressed:
-        drawColor = drawColor.darker(120);
-        break;
-    case ControlState::Disabled:
-        drawColor.setAlpha(100);
-        break;
-    default:
-        break;
-    }
-
+    // DEBUG: jede Control-Box einfärben
     p.save();
-    m_controlRenderer.renderControl(p, *ctrl, info, drawColor);
+    p.setPen(Qt::yellow);
+    p.drawRect(rect.adjusted(0, 0, -1, -1));
     p.restore();
+
+    // Aktuell: weiterleiten an den typbasierten Renderer
+    RenderControls::renderControl(p, rect, ctrl, themes, state);
 }
 
 // ------------------------------------------------------------
-// Dummy-State-Ermittlung (später via CanvasHandler ersetzen)
+// Dummy-State-Ermittlung (wird später erweitert)
 // ------------------------------------------------------------
 ControlState GuiRenderer::stateFor(const std::shared_ptr<ControlData>& ctrl) const
 {
-    Q_UNUSED(ctrl);
-    // Aktuell haben wir keine State-Flags – einfach Normal
+    if (!ctrl)
+        return ControlState::Normal;
+
+    if (ctrl->disabled)
+        return ControlState::Disabled;
+
+    if (ctrl->isPressed)
+        return ControlState::Pressed;
+
+    if (ctrl->isHovered)
+        return ControlState::Hover;
+
     return ControlState::Normal;
 }

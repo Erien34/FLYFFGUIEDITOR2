@@ -99,7 +99,8 @@ add_executable(${PROJECT_NAME} ${SRC_FILES}
     src/layout/model/ControlData.h src/layout/model/TokenData.h src/layout/model/WindowData.h
     src/renderer/RenderControls.cpp src/renderer/RenderControls.h src/renderer/RenderWindow.cpp src/renderer/RenderWindow.h
     src/defines/BehaviorManager.h src/defines/BehaviorManager.cpp
-    src/renderer/GuiRenderer.h src/renderer/GuiRenderer.cpp)
+    src/renderer/GuiRenderer.h src/renderer/GuiRenderer.cpp
+    src/renderer/ControlState.h)
 
 # -----------------------------------------
 # 🔗 Mit Qt-Bibliotheken verknüpfen

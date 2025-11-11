@@ -3,8 +3,7 @@
 #include "layout/LayoutManager.h"
 #include "layout/model/ControlData.h"
 
-#include "renderer/RenderWindow.h"
-#include "renderer/RenderControls.h"
+#include "renderer/GuiRenderer.h"
 
 #include <QPainter>
 #include <QPaintEvent>
@@ -20,6 +19,9 @@ Canvas::Canvas(ProjectController* controller, LayoutManager* lm, QWidget* parent
     setAttribute(Qt::WA_OpaquePaintEvent);
     setAttribute(Qt::WA_NoSystemBackground);
     setMouseTracking(true);
+
+    // GuiRenderer ohne BehaviorManager – kann später nachgerüstet werden
+    m_renderer = std::make_unique<GuiRenderer>(nullptr, this);
 }
 
 void Canvas::setActiveWindow(const std::shared_ptr<WindowData>& wnd)
@@ -76,6 +78,12 @@ void Canvas::paintEvent(QPaintEvent* event)
         return;
     }
 
+    if (!m_renderer) {
+        p.setPen(Qt::red);
+        p.drawText(rect(), Qt::AlignCenter, "GuiRenderer nicht initialisiert");
+        return;
+    }
+
     // Nur aktives Fenster
     if (m_renderMode == RenderMode::ActiveOnly) {
         if (!m_activeWindow) {
@@ -83,17 +91,16 @@ void Canvas::paintEvent(QPaintEvent* event)
             p.drawText(rect(), Qt::AlignCenter, "Kein Fenster ausgewählt");
             return;
         }
-        RenderWindow::renderWindow(p, m_activeWindow, themes, size());
+
+        std::vector<std::shared_ptr<WindowData>> single{ m_activeWindow };
+        m_renderer->render(p, single, themes, size());
         return;
     }
 
     // Alle Fenster rendern
     if (m_renderMode == RenderMode::AllWindows) {
         const auto& windows = m_layoutManager->processedWindows();
-        for (const auto& wnd : windows) {
-            if (wnd)
-                RenderWindow::renderWindow(p, wnd, themes, size());
-        }
+        m_renderer->render(p, windows, themes, size());
 
         p.setPen(QColor(200, 200, 200));
         p.drawText(10, 20, "[Preview Mode – Alle Fenster]");
