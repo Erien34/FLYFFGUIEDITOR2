@@ -1,9 +1,6 @@
 #pragma once
 
 #include <QObject>
-#include <QMap>
-#include <QSet>
-#include <QJsonObject>
 #include <QString>
 #include <memory>
 #include <vector>
@@ -12,11 +9,11 @@
 #include "model/WindowData.h"
 #include "model/ControlData.h"
 
-
 class LayoutBackend;
+class BehaviorManager;
 
 // ================================================================
-// LayoutManager – verarbeitet, validiert und generiert Layoutdaten
+// LayoutManager – kümmert sich um Layoutstruktur & Serialisierung
 // ================================================================
 class LayoutManager : public QObject
 {
@@ -25,51 +22,19 @@ class LayoutManager : public QObject
 public:
     explicit LayoutManager(LayoutParser& parser, LayoutBackend& backend);
 
+    // Behavior anbinden
+    void setBehaviorManager(BehaviorManager* behavior) { m_behavior = behavior; }
+
     // ------------------------------
     // 🔹 Datenaktualisierung
     // ------------------------------
-    void refreshFromFiles(const QString& wndPath, const QString& ctrlPath);
     void refreshFromParser();
 
     // ------------------------------
     // 🔹 Layout-Verarbeitung
+    //    (ruft BehaviorManager für Validierung/Analyse auf)
     // ------------------------------
     void processLayout();
-
-    // ------------------------------
-    // 🔹 Flag-Validierung
-    // ------------------------------
-    void validateWindowFlags(WindowData* win);
-    void validateControlFlags(ControlData* ctrl);
-
-    // ------------------------------
-    // 🔹 Analyse und Filterung
-    // ------------------------------
-    void analyzeControlTypes();
-    bool allowsPropertyForType(const QString& type, const QString& property) const;
-
-    // ------------------------------
-    // 🔹 Regeln & Flag-Gruppen
-    // ------------------------------
-    QJsonObject getWindowFlagRules() const;
-    QJsonObject getControlFlagRules() const;
-
-    QSet<QString> allowedControlFlags(const QString& typeName) const;
-    QSet<QString> allowedWindowFlags(const QString& typeName) const;
-
-    void generateDefaultWindowFlagRules();
-    void generateDefaultControlFlagRules();
-
-    // ------------------------------
-    // 🔹 Unknown Controls
-    // ------------------------------
-    void generateUnknownControls();  // NEU: ergänzt undefinedControlBits in control_flags.json
-
-    // ------------------------------
-    // 🔹 Flags aktualisieren
-    // ------------------------------
-    void updateControlFlags(const std::shared_ptr<ControlData>& ctrl);
-    void updateWindowFlags(const std::shared_ptr<WindowData>& wnd);
 
     // ------------------------------
     // 🔹 Serialisierung / Suche
@@ -80,44 +45,24 @@ public:
     // ------------------------------
     // 🔹 Zugriff
     // ------------------------------
-    const std::vector<std::shared_ptr<WindowData>>& processedWindows() const { return m_windows; }
-    const QMap<QString, quint32>& windowFlags() const { return m_windowFlags; }
-    const QMap<QString, quint32>& controlFlags() const { return m_controlFlags; }
-    const QMap<QString, quint32>& windowTypes() const { return m_windowTypes; }
+    const std::vector<std::shared_ptr<WindowData>>& processedWindows() const
+    {
+        return m_windows;
+    }
+
+    // Für BehaviorManager: Zugriff auf Backend
+    LayoutBackend& backend()             { return m_backend; }
+    const LayoutBackend& backend() const { return m_backend; }
 
 signals:
     void tokensReady();
 
 private:
-    // ------------------------------
-    // 🔧 Member
-    // ------------------------------
-    LayoutParser& m_parser;
-    LayoutBackend& m_backend;
+    LayoutParser&   m_parser;
+    LayoutBackend&  m_backend;
+    BehaviorManager* m_behavior = nullptr;
 
     std::vector<std::shared_ptr<WindowData>> m_windows;
-    QMap<QString, quint32> m_windowFlags;
-    QMap<QString, quint32> m_controlFlags;
-    QMap<QString, quint32> m_windowTypes;
 
-    // Regeln (aus window_flag_rules.json / control_flag_rules.json)
-    mutable QJsonObject m_windowRules;
-    mutable QJsonObject m_controlRules;
-    mutable bool m_windowRulesLoaded = false;
-    mutable bool m_controlRulesLoaded = false;
-    QMap<QString, QSet<QString>> m_validFlagsByType;
-
-    // Analyse
-    QMap<QString, QSet<QString>> m_controlTypeProperties;
-
-    // 🆕 Gesammelte unbekannte Bits pro Control-Typ
-    QMap<QString, QMap<QString, QSet<QString>>> m_unknownControlBits;
-
-    // ------------------------------
-    // 🔹 Hilfsfunktionen
-    // ------------------------------
     QString unquote(const QString& s) const;
-    void reloadWindowFlagRules();
-    void reloadControlFlagRules();
-    void rebuildValidFlagCache();
 };

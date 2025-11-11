@@ -40,6 +40,7 @@ public:
 
     LayoutManager* layoutManager() const { return m_layoutManager.get(); }
     TextManager* textManager() const { return m_textManager.get(); }
+    BehaviorManager* behaviorManager() const { return m_behaviorManager.get(); }
 
     std::shared_ptr<WindowData>  currentWindow() const { return m_currentWindow; }
     std::shared_ptr<ControlData> currentControl() const { return m_currentControl; }

@@ -165,7 +165,8 @@ bool ProjectController::loadProject(const QString& configPath)
     // -----------------------------------------
     // 3️⃣ LayoutManager vorbereiten
     // -----------------------------------------
-    m_layoutManager->refreshFromFiles(wndFlagsPath, ctrlFlagsPath);
+    if (m_behaviorManager)
+        m_behaviorManager->refreshFlagsFromFiles();
 
     // -----------------------------------------
     // 4️⃣ Layout laden (startet Parser & Tokens)
@@ -450,25 +451,22 @@ void ProjectController::bindPanels(WindowPanel* windowPanel, PropertyPanel* prop
     // ----------------------------------------------------
     connect(propertyPanel, &PropertyPanel::flagsChanged,
             this, [this](quint32 newMask) {
-                auto wnd = currentWindow();
+                auto wnd  = currentWindow();
                 auto ctrl = currentControl();
 
-                // 🔸 Sicherheits-Check: Kein aktives Element
-                if (!m_layoutManager) {
-                    qWarning() << "[ProjectController] ⚠ Kein LayoutManager vorhanden – Flags ignoriert.";
+                if (!m_behaviorManager) {
+                    qWarning() << "[ProjectController] Kein BehaviorManager vorhanden – Flags ignoriert.";
                     return;
                 }
                 if (!wnd && !ctrl) {
-                    qWarning() << "[ProjectController] ⚠ Kein aktives Fenster oder Control beim Flag-Update.";
+                    qWarning() << "[ProjectController] Kein aktives Fenster oder Control beim Flag-Update.";
                     return;
                 }
 
                 const QMap<QString, quint32> flagMap =
-                    (ctrl ? m_layoutManager->controlFlags() : m_layoutManager->windowFlags());
+                    (ctrl ? m_behaviorManager->controlFlags()
+                          : m_behaviorManager->windowFlags());
 
-                // -------------------------------
-                // 🔸 Mask & resolvedMask aktualisieren
-                // -------------------------------
                 if (ctrl) {
                     ctrl->flagsMask = newMask;
                     ctrl->resolvedMask.clear();
@@ -477,6 +475,9 @@ void ProjectController::bindPanels(WindowPanel* windowPanel, PropertyPanel* prop
                         if (ctrl->flagsMask & it.value())
                             ctrl->resolvedMask << it.key();
                     }
+
+                    // Konsistent: BehaviorManager darf noch zusätzliche Dinge tun
+                    m_behaviorManager->updateControlFlags(ctrl);
 
                     qInfo() << "[ProjectController] Control flags aktualisiert für" << ctrl->id;
                 }
@@ -489,12 +490,11 @@ void ProjectController::bindPanels(WindowPanel* windowPanel, PropertyPanel* prop
                             wnd->resolvedMask << it.key();
                     }
 
+                    m_behaviorManager->updateWindowFlags(wnd);
+
                     qInfo() << "[ProjectController] Window flags aktualisiert für" << wnd->name;
                 }
 
-                // -------------------------------
-                // 🔸 Renderer & UI aktualisieren
-                // -------------------------------
                 qInfo() << "[ProjectController] → UI-Refresh angefordert";
                 emit uiRefreshRequested();
             });
@@ -520,10 +520,10 @@ void ProjectController::bindPanels(WindowPanel* windowPanel, PropertyPanel* prop
 void ProjectController::toggleControlFlag(const QString& flagName, bool enabled)
 {
     auto ctrl = currentControl();
-    if (!ctrl)
+    if (!ctrl || !m_behaviorManager)
         return;
 
-    const auto& flagMap = layoutManager()->controlFlags();
+    const auto& flagMap = m_behaviorManager->controlFlags();
     if (!flagMap.contains(flagName))
         return;
 
@@ -534,7 +534,6 @@ void ProjectController::toggleControlFlag(const QString& flagName, bool enabled)
     else
         ctrl->flagsMask &= ~bit;
 
-    // 🧠 resolvedMask aktualisieren
     ctrl->resolvedMask.clear();
     for (auto it = flagMap.constBegin(); it != flagMap.constEnd(); ++it) {
         if (ctrl->flagsMask & it.value())
@@ -549,10 +548,10 @@ void ProjectController::toggleControlFlag(const QString& flagName, bool enabled)
 
 void ProjectController::toggleWindowFlag(const QString& flag, bool enable)
 {
-    if (!m_currentWindow || !m_layoutManager)
+    if (!m_currentWindow || !m_behaviorManager)
         return;
 
-    const auto& map = m_layoutManager->windowFlags();
+    const auto& map = m_behaviorManager->windowFlags();
     if (!map.contains(flag))
         return;
 
@@ -562,10 +561,8 @@ void ProjectController::toggleWindowFlag(const QString& flag, bool enable)
     else
         m_currentWindow->flagsMask &= ~bit;
 
-    // 💾 Persistieren
-    m_layoutManager->updateWindowFlags(m_currentWindow);
+    m_behaviorManager->updateWindowFlags(m_currentWindow);
 
-    // 🔄 UI aktualisieren
     emit uiRefreshRequested();
 }
 
@@ -601,8 +598,13 @@ void ProjectController::updateWindowFlags(const QString& windowName, quint32 mas
         return;
     }
 
-    // Flag-Namen aus LayoutManager holen
-    const auto& allFlags = layoutManager()->windowFlags();
+    if (!m_behaviorManager) {
+        qWarning().noquote() << "[ProjectController] updateWindowFlags(): Kein BehaviorManager verfügbar.";
+        return;
+    }
+
+    // Flag-Namen aus BehaviorManager holen
+    const auto& allFlags = m_behaviorManager->windowFlags();
     QString flagName;
 
     for (auto it = allFlags.constBegin(); it != allFlags.constEnd(); ++it) {
@@ -613,7 +615,8 @@ void ProjectController::updateWindowFlags(const QString& windowName, quint32 mas
     }
 
     if (flagName.isEmpty()) {
-        qWarning().noquote() << "[ProjectController] Unbekannter Flag-Mask:" << QString("0x%1").arg(mask, 0, 16);
+        qWarning().noquote() << "[ProjectController] Unbekannter Flag-Mask:"
+                             << QString("0x%1").arg(mask, 0, 16);
         return;
     }
 
@@ -627,7 +630,8 @@ void ProjectController::updateWindowFlags(const QString& windowName, quint32 mas
         wnd->resolvedMask.removeAll(flagName);
     }
 
-    layoutManager()->updateWindowFlags(wnd);
+    // BehaviorManager aktualisiert ggf. weitere abgeleitete Infos
+    m_behaviorManager->updateWindowFlags(wnd);
 
     qInfo().noquote() << QString("[ProjectController] Window '%1' Flags aktualisiert → %2 (%3)")
                              .arg(windowName)
@@ -645,7 +649,12 @@ void ProjectController::updateControlFlags(const QString& controlId, quint32 mas
         return;
     }
 
-    const auto& allFlags = layoutManager()->controlFlags();
+    if (!m_behaviorManager) {
+        qWarning().noquote() << "[ProjectController] updateControlFlags(): Kein BehaviorManager verfügbar.";
+        return;
+    }
+
+    const auto& allFlags = m_behaviorManager->controlFlags();
     QString flagName;
 
     for (auto it = allFlags.constBegin(); it != allFlags.constEnd(); ++it) {
@@ -661,14 +670,14 @@ void ProjectController::updateControlFlags(const QString& controlId, quint32 mas
         return;
     }
 
-    // 🔹 Masken-Update (nur Maske selbst ändern)
+    // Maske aktualisieren
     if (enabled)
         ctrl->flagsMask |= mask;
     else
         ctrl->flagsMask &= ~mask;
 
-    // 🔹 LayoutManager aktualisiert resolvedMask automatisch
-    layoutManager()->updateControlFlags(ctrl);
+    // BehaviorManager baut resolvedMask neu auf / ergänzt
+    m_behaviorManager->updateControlFlags(ctrl);
 
     qInfo().noquote() << QString("[ProjectController] Control '%1' Flags aktualisiert → %2 (%3)")
                              .arg(controlId)

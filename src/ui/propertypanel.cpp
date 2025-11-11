@@ -1,6 +1,6 @@
 #include "PropertyPanel.h"
 #include "core/ProjectController.h"
-#include "layout/LayoutManager.h"
+#include "defines/BehaviorManager.h"
 #include "layout/model/WindowData.h"
 #include "layout/model/ControlData.h"
 
@@ -50,8 +50,8 @@ void PropertyPanel::showWindowProps(const std::shared_ptr<WindowData>& wnd)
 
     clear();
 
-    auto* lm = m_controller->layoutManager();
-    if (!lm)
+    auto* bm = m_controller->behaviorManager();
+    if (!bm)
         return;
 
     // ==========================================================
@@ -95,14 +95,14 @@ void PropertyPanel::showWindowProps(const std::shared_ptr<WindowData>& wnd)
     // ==========================================================
     // FLAG-GRUPPE
     // ==========================================================
-    const QMap<QString, quint32> allFlags = lm->windowFlags();
+    const QMap<QString, quint32> allFlags = bm->windowFlags();
 
     // 🔹 Aktive Flags bestimmen
     QStringList activeFlags = wnd->resolvedMask;
 
     // 🔹 Regelobjekt laden
     QJsonObject rules;
-    const QJsonObject windowRules = lm->getWindowFlagRules();
+    const QJsonObject windowRules = bm->getWindowFlagRules();
 
     if (!windowRules.isEmpty()) {
         if (windowRules.contains(wnd->name))
@@ -165,8 +165,8 @@ void PropertyPanel::showControlProps(const std::shared_ptr<WindowData>& wnd,
 
     clear();
 
-    auto* lm = m_controller->layoutManager();
-    if (!lm)
+    auto* bm = m_controller->behaviorManager();
+    if (!bm)
         return;
 
     // ==========================================================
@@ -211,7 +211,7 @@ void PropertyPanel::showControlProps(const std::shared_ptr<WindowData>& wnd,
     // ==========================================================
     // FLAG-GRUPPE (mit JSON-Regeln)
     // ==========================================================
-    const QMap<QString, quint32> allFlags = lm->controlFlags();
+    const QMap<QString, quint32> allFlags = bm->controlFlags();
     QStringList activeFlags;
 
     // ✅ Nur echte Bitmaske berücksichtigen, keine Regel-Defaults
@@ -225,7 +225,7 @@ void PropertyPanel::showControlProps(const std::shared_ptr<WindowData>& wnd,
 
     // 🔹 Regelobjekt für diesen Control-Typ laden
     QJsonObject rules;
-    const QJsonObject controlRules = lm->getControlFlagRules();
+    const QJsonObject controlRules = bm->getControlFlagRules();
 
     if (!controlRules.isEmpty()) {
         if (controlRules.contains(ctrl->type))
