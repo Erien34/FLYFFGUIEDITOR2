@@ -8,26 +8,26 @@
 
 #include "layout/model/ControlData.h"
 
-// =====================================================
-//  RenderControls – Hauptmodul für FlyFF UI Rendering
-// =====================================================
+// Forward-Decl (kommt aus BehaviorManager.h)
+struct BehaviorInfo;
 
-namespace RenderControls
+// =====================================================
+//  RenderControls – Renderer-Klasse für FlyFF-Controls
+// =====================================================
+class RenderControls
 {
+public:
+    RenderControls() = default;
 
-// =====================================================
-//  🔹 Allgemeine Statestruktur für Controls
-// =====================================================
+    // Haupt-Dispatcher für ein einzelnes Control
+    // behavior kann später genutzt werden (Capabilities, States, etc.),
+    // aktuell wird es noch nicht ausgewertet.
+    void renderControl(QPainter& p,
+                       const QRect& rect,
+                       const std::shared_ptr<ControlData>& ctrl,
+                       const QMap<QString, QPixmap>& themes,
+                       const BehaviorInfo* behavior = nullptr);
 
-struct ControlStates
-{
-    QPixmap normal;
-    QPixmap hover;
-    QPixmap pressed;
-    QPixmap disabled;
-
-    bool isValid() const { return !normal.isNull(); }
-};
 
 // =====================================================
 //  🔹 Hilfsfunktionen
@@ -41,9 +41,6 @@ void renderEditBackground(QPainter& p, const QRect& rect,
 
 void renderVerticalScrollBar(QPainter& p, const QRect& rect,
                              const QMap<QString, QPixmap>& themes);
-
-ControlStates loadControlStates(const QMap<QString, QPixmap>& themes,
-                                const QString& baseKey);
 
 // =====================================================
 //  🔹 Renderer für einzelne Controltypen
@@ -100,11 +97,6 @@ void renderTreeCtrl(QPainter& p, const QRect& rect,
                     const std::shared_ptr<ControlData>& ctrl,
                     const QMap<QString, QPixmap>& themes);
 
-// =====================================================
-//  🔹 Haupt-Dispatcher
-// =====================================================
-void renderControl(QPainter& p, const QRect& rect,
-                   const std::shared_ptr<ControlData>& ctrl,
-                   const QMap<QString, QPixmap>& themes);
+};
 
-} // namespace RenderControls
+
