@@ -1,21 +1,20 @@
 #pragma once
+#include "WindowData.h"
 #include <QObject>
 #include <QPainter>
 
 class ThemeManager;
 class BehaviorManager;
 class RenderWindow;
-class RenderControls;
+//class RenderControls;
 
 class RenderManager : public QObject {
     Q_OBJECT
 public:
-    explicit RenderManager(ThemeManager* themeMgr,
-                           BehaviorManager* behaviorMgr,
-                           QObject* parent = nullptr);
+    RenderManager(ThemeManager* themeMgr, BehaviorManager* behaviorMgr);
 
     // Zeichnet den gesamten Canvas
-    void render(QPainter& painter, const QSize& size);
+    void render(QPainter* painter, const std::shared_ptr<WindowData>& wnd);
 
 signals:
     // Wird gesendet, wenn eine Neuzeichnung nötig ist
@@ -26,9 +25,8 @@ public slots:
     void refresh();
 
 private:
-    ThemeManager*    m_themeMgr        = nullptr;
-    BehaviorManager* m_behaviorMgr     = nullptr;
-
+    ThemeManager* m_themeManager;
+    BehaviorManager* m_behaviorManager;
     std::unique_ptr<RenderWindow> m_windowRenderer;
-    std::unique_ptr<RenderControls> m_controlRenderer;
+    //std::unique_ptr<RenderControl> m_controlRenderer;
 };

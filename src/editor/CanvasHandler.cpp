@@ -25,6 +25,7 @@ void CanvasHandler::showWindow(const std::shared_ptr<WindowData>& wnd)
 void CanvasHandler::onActiveWindowChanged(const std::shared_ptr<WindowData>& wnd)
 {
     showWindow(wnd);
+    m_canvas->update();
 }
 
 // void CanvasHandler::onMousePress(QMouseEvent* event)  { qDebug() << "Mouse Press" << event->pos(); }

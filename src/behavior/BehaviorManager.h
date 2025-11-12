@@ -89,6 +89,7 @@ public:
     // -----------------------------------------
     void updateWindowFlags(const std::shared_ptr<WindowData>& wnd) const;
     void updateControlFlags(const std::shared_ptr<ControlData>& ctrl) const;
+    void applyWindowStyle(WindowData& wnd) const;
 
     // -----------------------------------------
     // 🔹 Validierung & Analyse (LayoutManager ruft das)

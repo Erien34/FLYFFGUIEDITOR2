@@ -18,6 +18,9 @@ public:
     QString textIncPath() const;
 
     QString themePath() const { return m_config ? m_config->themePath() : QString(); }
+    QString defaultThemePath() const;
+    QString themeFolderPath(const QString& name) const;
+
     QString iconPath()  const { return m_config ? m_config->iconPath()  : QString(); }
     QString sourcePath() const { return m_config ? m_config->sourcePath() : QString(); }
 
@@ -25,6 +28,7 @@ public:
     QString findTextFile(const QString& baseDir) const;
     QString findTextIncFile(const QString& layoutFile) const;
     QString findDefineFile(const QString& baseDir) const;
+    QStringList findThemeFilesRecursive(const QStringList& names) const;
 
     // JSON-Dateien
     QJsonObject loadJsonObject(const QString& filePath) const;

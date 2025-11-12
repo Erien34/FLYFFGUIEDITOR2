@@ -312,6 +312,105 @@ void BehaviorManager::updateControlFlags(const std::shared_ptr<ControlData>& ctr
     }
 }
 
+void BehaviorManager::applyWindowStyle(WindowData& wnd) const
+{
+    wnd.resolvedMask.clear();
+
+    const quint32 style = wnd.flagsMask;
+
+    auto has = [&](const QString& key) -> bool {
+        return style & m_windowFlags.value(key, 0);
+    };
+
+    //
+    // 🧩 Basis-Fensterverhalten
+    //
+    if (has("WBS_MOVE"))       wnd.resolvedMask.append("movable");
+    if (has("WBS_MODAL"))      wnd.resolvedMask.append("modal");
+    if (has("WBS_CHILD"))      wnd.resolvedMask.append("is_child");
+    if (has("WBS_TOPMOST"))    wnd.resolvedMask.append("always_on_top");
+
+    //
+    // 🪟 Rahmen & Caption
+    //
+    if (has("WBS_THICKFRAME") || has("WBS_RESIZEABLE"))
+        wnd.resolvedMask.append("resizable");
+
+    if (has("WBS_CAPTION"))
+        wnd.resolvedMask.append("has_caption");
+    else
+        wnd.resolvedMask.append("no_caption");
+
+    if (has("WBS_NOFRAME"))
+        wnd.resolvedMask.append("no_frame");
+    else
+        wnd.resolvedMask.append("has_frame");
+
+    //
+    // 🎛️ Titelbuttons
+    // Hier interpretieren wir das 0x80-Bit (NOCLOSE/NOCENTER) kontextabhängig
+    //
+    static const QStringList hudWindows = {
+        "APP_MINIMAP",
+        "APP_HP_GAUGE",
+        "APP_QUICK_SLOT",
+        "APP_TARGET_INFO",
+        "APP_CHAT",
+        "APP_PLAYER_INFO",
+        "APP_BUFF",
+        "APP_ACTION_SLOT"
+    };
+
+    const bool isHudWindow =
+        hudWindows.contains(wnd.name, Qt::CaseInsensitive);
+
+    const bool hasNoCloseFlag  = has("WBS_NOCLOSE");
+    const bool hasNoCenterFlag = has("WBS_NOCENTER");
+
+    bool hideCloseButton = false;
+
+    // 🧠 Regel:
+    // - HUDs → NOCENTER aktiv, Close irrelevant
+    // - normale Fenster → NOCLOSE aktiv, beeinflusst Buttonanzeige
+    if (isHudWindow) {
+        if (hasNoCenterFlag)
+            wnd.resolvedMask.append("no_center");
+        hideCloseButton = true;
+    } else {
+        hideCloseButton = hasNoCloseFlag;
+    }
+
+    // Close-Button nur anzeigen, wenn erlaubt
+    if (!hideCloseButton)
+        wnd.resolvedMask.append("has_close");
+
+    //
+    // 🧭 Weitere Standard-Buttons
+    //
+    if (has("WBS_HELP"))        wnd.resolvedMask.append("has_help");
+    if (has("WBS_PIN"))         wnd.resolvedMask.append("has_pin");
+    if (has("WBS_VIEW"))        wnd.resolvedMask.append("has_view");
+    if (has("WBS_EXTENSION"))   wnd.resolvedMask.append("has_extension");
+    if (has("WBS_MINIMIZEBOX")) wnd.resolvedMask.append("has_minimize");
+    if (has("WBS_MAXIMIZEBOX")) wnd.resolvedMask.append("has_maximize");
+
+    //
+    // 🧩 Sichtbarkeit & Fallback
+    //
+    if (has("WBS_VISIBLE"))     wnd.resolvedMask.append("visible");
+    if (!wnd.resolvedMask.contains("has_frame") &&
+        !wnd.resolvedMask.contains("no_frame"))
+        wnd.resolvedMask.append("default_frame");
+
+    //
+    // 🧾 Debug-Ausgabe
+    //
+    qDebug().noquote()
+        << QString("[BehaviorManager] applyWindowStyle → %1 (0x%2)")
+               .arg(wnd.name)
+               .arg(style, 0, 16)
+        << "\n → resolvedMask:" << wnd.resolvedMask;
+}
 // ---------------------------------------------------------
 // Validierung – aktuell sehr einfach, kann später ausgebaut werden
 // ---------------------------------------------------------

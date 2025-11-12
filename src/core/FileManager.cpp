@@ -191,6 +191,30 @@ QString FileManager::definePath() const
     return m_definePath;
 }
 
+QStringList FileManager::findThemeFilesRecursive(const QStringList& names) const
+{
+    QStringList found;
+    QString themeRoot = themePath();  // dein vorhandener Getter
+    if (themeRoot.isEmpty())
+        return found;
+
+    QDirIterator it(themeRoot, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+
+    while (it.hasNext()) {
+        QString filePath = it.next();
+        QString baseName = QFileInfo(filePath).baseName();
+
+        for (const QString& name : names) {
+            if (baseName.contains(name, Qt::CaseInsensitive)) {
+                found << filePath;
+                break;
+            }
+        }
+    }
+
+    return found;
+}
+
 QJsonObject FileManager::loadJsonObject(const QString& filePath) const
 {
     QFile file(filePath);
@@ -333,4 +357,20 @@ bool FileManager::saveJsonObject(const QString& filePath, const QJsonObject& jso
 
     qInfo().noquote() << "[FileManager] JSON gespeichert:" << filePath;
     return true;
+}
+
+QString FileManager::themeFolderPath(const QString& name) const
+{
+    QString base = themePath(); // nutzt deine bestehende Funktion
+    if (base.isEmpty())
+        return {};
+
+    QDir dir(base);
+    QString full = dir.filePath(name);
+    return QDir::cleanPath(full);
+}
+
+QString FileManager::defaultThemePath() const
+{
+    return themeFolderPath("Default");
 }

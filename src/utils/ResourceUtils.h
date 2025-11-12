@@ -150,7 +150,8 @@ inline QPixmap loadSinglePixmap(const QString& filePath)
 // ------------------------------------------------------------
 // 🔹 Lädt alle Pixmaps (Themes / Fensterrahmen / UI)
 // ------------------------------------------------------------
-inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath)
+inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath,
+                                          const QString& themeName = QString())
 {
     QMap<QString, QPixmap> result;
 
@@ -162,12 +163,13 @@ inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath)
     const QStringList filters = {"*.tga", "*.png", "*.jpg", "*.bmp"};
     QDirIterator it(dirPath, filters, QDir::Files, QDirIterator::Subdirectories);
 
-    QFile logFile(dirPath + "/theme_debug_log.txt");
+    QString logName = themeName.isEmpty() ? "theme_debug_log.txt"
+                                          : QString("theme_debug_%1_log.txt").arg(themeName);
+    QFile logFile(QDir(dirPath).filePath(logName));
     logFile.open(QIODevice::WriteOnly | QIODevice::Text);
     QTextStream log(&logFile);
 
-    int loaded = 0;
-    int failed = 0;
+    int loaded = 0, failed = 0;
 
     while (it.hasNext()) {
         const QString filePath = it.next();
@@ -176,7 +178,7 @@ inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath)
 
         QPixmap pix = loadSinglePixmap(filePath);
         pix = clampTransparentEdges(pix);
-        pix = applyMagentaMask(pix);     // 🆕 FlyFF-Magenta-Transparenz anwenden
+        pix = applyMagentaMask(pix);
 
         if (pix.isNull()) {
             log << "❌ Fehler: " << filePath << "\n";
@@ -185,23 +187,45 @@ inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath)
         }
 
         result.insert(key, pix);
+        log << "✅ Geladen: " << key << " (" << pix.width() << "x" << pix.height() << ")\n";
         loaded++;
-        log << "✅ Geladen: " << key
-            << " (" << pix.width() << "x" << pix.height() << ")\n";
     }
 
     log << "\nGesamt geladen: " << loaded
         << " | Fehler: " << failed
         << " | Gesamtdateien: " << (loaded + failed) << "\n";
-
     logFile.close();
 
-    qInfo().noquote() << QString("[ResourceUtils] Themes geladen: %1 Texturen (%2 Fehler)")
+    qInfo().noquote() << QString("[ResourceUtils] Theme '%1': %2 Texturen (%3 Fehler)")
+                             .arg(themeName.isEmpty() ? "(unknown)" : themeName)
                              .arg(loaded)
                              .arg(failed);
-    qInfo().noquote() << QString("[ResourceUtils] Log-Datei: %1").arg(logFile.fileName());
 
     return result;
+}
+
+inline QMap<QString, QPixmap> loadMergedThemes(const QString& defaultPath,
+                                               const QString& customPath = QString(),
+                                               const QString& themeName = QString())
+{
+    // 1️⃣ Default laden
+    QMap<QString, QPixmap> merged = loadPixmaps(defaultPath, "Default");
+
+    // 2️⃣ Wenn Custom-Theme vorhanden → überschreibe Default-Einträge
+    if (!customPath.isEmpty() && QDir(customPath).exists()) {
+        QMap<QString, QPixmap> custom = loadPixmaps(customPath, themeName);
+
+        for (auto it = custom.begin(); it != custom.end(); ++it)
+            merged[it.key()] = it.value();
+
+        qInfo().noquote() << QString("[ResourceUtils] Themes kombiniert: Default + %1 (%2 Texturen)")
+                                 .arg(themeName.isEmpty() ? "Custom" : themeName)
+                                 .arg(merged.size());
+    } else {
+        qInfo() << "[ResourceUtils] Kein zusätzliches Theme gefunden, verwende nur Default.";
+    }
+
+    return merged;
 }
 
 // ------------------------------------------------------------

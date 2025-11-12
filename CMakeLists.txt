@@ -45,6 +45,7 @@ set(SRC_RENDER
     src/render/RenderControls.h
     src/render/RenderMode.h
     src/render/ControlState.h
+    src/render/WindowState.h
 )
 
 # ---- Theme ----
@@ -139,7 +140,9 @@ set(SRC_FILES
 # ============================================================
 # ⚙️ 4. Executable & Includes
 # ============================================================
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+add_executable(${PROJECT_NAME} ${SRC_FILES}
+    WindowState.h
+)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     src

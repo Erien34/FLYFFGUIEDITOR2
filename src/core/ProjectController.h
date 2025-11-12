@@ -89,9 +89,10 @@ private:
     std::unique_ptr<TextManager>    m_textManager;
     std::unique_ptr<TextBackend>    m_textBackend;
     std::unique_ptr<LayoutManager>  m_layoutManager;
+    std::unique_ptr<ThemeManager>  m_themeManager;
     std::unique_ptr<BehaviorManager> m_behaviorManager;
     std::unique_ptr<RenderManager> m_renderManager;
-    std::unique_ptr<ThemeManager>  m_themeManager;
+
 
     // 🔧 Ressourcen
     QMap<QString, QIcon>   m_icons;

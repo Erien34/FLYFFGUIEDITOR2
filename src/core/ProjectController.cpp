@@ -42,7 +42,7 @@ ProjectController::ProjectController(QObject* parent)
     m_layoutManager(std::make_unique<LayoutManager>(*m_layoutParser, *m_layoutBackend)),
 
     // --- neue Grafik-Komponenten ---
-    m_themeManager(std::make_unique<ThemeManager>()),
+    m_themeManager(std::make_unique<ThemeManager>(m_fileManager.get())),
     m_behaviorManager(std::make_unique<BehaviorManager>(
         m_flagManager.get(),
         m_textManager.get(),
@@ -213,9 +213,26 @@ bool ProjectController::loadProject(const QString& configPath)
     // -----------------------------------------
     // 7️⃣ Ressourcen (Icons / Themes)
     // -----------------------------------------
-    m_icons  = ResourceUtils::loadIcons(iconDir);
-    m_themes = ResourceUtils::loadPixmaps(themeDir);
-    qDebug().noquote() << "[Themes geladen] Keys:" << m_themes.keys();
+    m_icons = ResourceUtils::loadIcons(iconDir);
+
+    // Theme laden über ThemeManager
+    if (m_themeManager)
+    {
+        // Standardmäßig das Default-Theme laden
+        QString defaultTheme = "Default";
+
+        // Optional: wenn "English" oder anderes existiert
+        QString englishPath = m_fileManager->themeFolderPath("English");
+        if (QDir(englishPath).exists())
+            defaultTheme = "English";
+
+        qInfo().noquote() << "[ProjectController] Lade Theme über ThemeManager:" << defaultTheme;
+        m_themeManager->loadTheme(defaultTheme);
+    }
+    else
+    {
+        qWarning() << "[ProjectController] Kein ThemeManager verfügbar!";
+    }
 
     // -----------------------------------------
     // 🔒 Abschluss-Check: Tokens schon da?

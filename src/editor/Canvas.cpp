@@ -34,8 +34,8 @@ void Canvas::paintEvent(QPaintEvent*)
     QPainter painter(this);
     painter.fillRect(rect(), QColor(45, 45, 45));
 
-    if (m_renderManager)
-        m_renderManager->render(painter, size());
+    if (m_renderManager && m_activeWindow)
+        m_renderManager->render(&painter, m_activeWindow);
     else
         painter.drawText(rect(), Qt::AlignCenter, "RenderManager nicht verfügbar");
 }

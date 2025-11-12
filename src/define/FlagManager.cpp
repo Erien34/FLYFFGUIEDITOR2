@@ -14,6 +14,9 @@
 FlagManager::FlagManager(ConfigManager* config)
     : m_config(config)
 {
+    m_legacyOverrides = {
+        "WBS_NOCLOSE"
+    };
     qInfo() << "[FlagManager] Initialisiert.";
 }
 
@@ -227,55 +230,101 @@ void FlagManager::applyDefaultWindowFlags()
 {
     static const QMap<QString, QString> defaults = {
         {"WBS_CAPTION",       "0X02000000"},
-        {"WBS_CHECK",         "0X00000008"},
         {"WBS_CHILD",         "0X00020000"},
         {"WBS_CHILDFRAME",    "0X00800000"},
         {"WBS_DOCKING",       "0X04000000"},
         {"WBS_EXTENSION",     "0X00000020"},
         {"WBS_HELP",          "0X00000004"},
-        {"WBS_HIGHLIGHT",     "0X00000010"},
-        {"WBS_HIGHLIGHTPUSH", "0X00000020"},
-        {"WBS_HORI",          "0X00000001"},
-        {"WBS_HSCROLL",       "0X40000000"},
-        {"WBS_KEY",           "0X01000000"},
-        {"WBS_MANAGER",       "0X00100000"},
-        {"WBS_MAXIMIZEBOX",   "0X00000002"},
-        {"WBS_MENUITEM",      "0X00000100"},
-        {"WBS_MINIMIZEBOX",   "0X00000001"},
-        {"WBS_MODAL",         "0X00080000"},
-        {"WBS_MONEY",         "0X00000004"},
         {"WBS_MOVE",          "0X00010000"},
-        {"WBS_NOCENTER",      "0X00000080"},
-        {"WBS_NODRAWFRAME",   "0X00040000"},
+        {"WBS_MODAL",         "0X00080000"},
         {"WBS_NOFOCUS",       "0X80000000"},
         {"WBS_NOFRAME",       "0X00200000"},
+        {"WBS_NODRAWFRAME",   "0X00040000"},
+        {"WBS_TOPMOST",       "0X10000000"},
+        {"WBS_RESIZEABLE",    "0X00000040"},
+        {"WBS_THICKFRAME",    "0X00000040"},
+        {"WBS_POPUP",         "0X08000000"},
+        {"WBS_VSCROLL",       "0X20000000"},
+        {"WBS_HSCROLL",       "0X40000000"},
+        {"WBS_VIEW",          "0X00000008"},
+        {"WBS_PIN",           "0X00000010"},
+        {"WBS_MANAGER",       "0X00100000"},
+        {"WBS_KEY",           "0X01000000"},
+        {"WBS_SOUND",         "0X00400000"},
         {"WBS_NOMENUICON",    "0X00000400"},
         {"WBS_OVERRIDE_FIRST","0X00000040"},
-        {"WBS_PIN",           "0X00000010"},
-        {"WBS_POPUP",         "0X08000000"},
-        {"WBS_PUSHLIKE",      "0X00000200"},
-        {"WBS_RADIO",         "0X00000004"},
-        {"WBS_SOUND",         "0X00400000"},
-        {"WBS_SPRITE",        "0X00000002"},
-        {"WBS_TEXT",          "0X00000001"},
-        {"WBS_THICKFRAME",    "0X00000040"},
-        {"WBS_TOPMOST",       "0X10000000"},
-        {"WBS_VERT",          "0X00000002"},
-        {"WBS_VIEW",          "0X00000008"},
-        {"WBS_VSCROLL",       "0X20000000"}
+        {"WBS_NOCENTER",      "0X00000080"},
+        {"WBS_MAXIMIZEBOX",   "0X00000002"},
+        {"WBS_MINIMIZEBOX",   "0X00000001"}
     };
 
-    for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
-        if (!m_windowFlags.contains(it.key())) {
-            m_windowFlags.insert(it.key(), it.value());
-            qInfo() << "[FlagManager] Default Window-Flag ergänzt:"
-                    << it.key() << "=" << it.value();
+    static const QMap<QString, QString> legacyDefaults = {
+        {"WBS_CHECK",         "0X00000008"},
+        {"WBS_PUSHLIKE",      "0X00000200"},
+        {"WBS_RADIO",         "0X00000004"},
+        {"WBS_MONEY",         "0X00000004"},
+        {"WBS_TEXT",          "0X00000001"},
+        {"WBS_SPRITE",        "0X00000002"},
+        {"WBS_MENUITEM",      "0X00000100"},
+        {"WBS_HIGHLIGHT",     "0X00000010"},
+        {"WBS_HIGHLIGHTPUSH", "0X00000020"},
+        {"WBS_NOCLOSE",       "0X00000080"} // eigentlich legacy
+    };
+
+    int added = 0;
+    int legacy = 0;
+
+    // 🔹 Schritt 1: Legacy mit Override-Behandlung
+    for (auto it = legacyDefaults.constBegin(); it != legacyDefaults.constEnd(); ++it) {
+        const QString key = it.key();
+        const QString value = it.value();
+
+        if (m_legacyOverrides.contains(key)) {
+            // Legacy-Flag bleibt aktiv (z. B. NOCLOSE)
+            if (!m_windowFlags.contains(key)) {
+                m_windowFlags.insert(key, value);
+                added++;
+                qInfo().noquote() << "[FlagManager] ⚙️ Legacy-Override aktiv:" << key;
+            }
+            continue;
+        }
+
+        // Normales Legacy-Flag speichern
+        if (!m_legacyWindowFlags.contains(key)) {
+            m_legacyWindowFlags.insert(key, value);
+            legacy++;
         }
     }
 
-    qInfo() << "[FlagManager] Default WindowFlags hinzugefügt, gesamt:"
-            << m_windowFlags.size();
+    // 🔹 Schritt 2: Aktive Defaults einfügen
+    for (auto it = defaults.constBegin(); it != defaults.constEnd(); ++it) {
+        const QString key = it.key();
+        const QString value = it.value();
+
+        if (!m_windowFlags.contains(key)) {
+            m_windowFlags.insert(key, value);
+            added++;
+        }
+    }
+
+    // 🔹 Schritt 3: Sortieren (alphabetisch, case-insensitive)
+    QStringList sortedKeys = m_windowFlags.keys();
+    std::sort(sortedKeys.begin(), sortedKeys.end(), [](const QString& a, const QString& b) {
+        return a.compare(b, Qt::CaseInsensitive) < 0;
+    });
+
+    QMap<QString, QString> sortedMap;
+    for (const QString& key : sortedKeys)
+        sortedMap.insert(key, m_windowFlags.value(key));
+
+    m_windowFlags = sortedMap;
+
+    qInfo().noquote() << QString("[FlagManager] WindowFlags hinzugefügt: %1 | Legacy: %2 | Gesamt aktiv: %3")
+                             .arg(added)
+                             .arg(legacy)
+                             .arg(m_windowFlags.size());
 }
+
 
 void FlagManager::applyDefaultControlFlags()
 {
@@ -417,4 +466,83 @@ void FlagManager::saveJsonFile(const QString& path,
     } else {
         qWarning() << "[FlagManager] Fehler beim Schreiben von" << path;
     }
+}
+
+static QMap<QString, QString> loadFlagFile(const QString& path)
+{
+    QMap<QString, QString> map;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "[FlagManager] Datei nicht gefunden:" << path;
+        return map;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    file.close();
+    if (!doc.isObject()) {
+        qWarning() << "[FlagManager] Ungültiges JSON:" << path;
+        return map;
+    }
+
+    const QJsonObject obj = doc.object();
+    for (auto it = obj.begin(); it != obj.end(); ++it)
+        map.insert(it.key(), it.value().toString().toUpper());
+
+    qInfo().noquote() << QString("[FlagManager] Geladen: %1 (%2 Einträge)")
+                             .arg(QFileInfo(path).fileName())
+                             .arg(map.size());
+
+    return map;
+}
+
+// ===========================================================
+// Legacy-Loader (getrennte Ordnerstruktur)
+// ===========================================================
+bool FlagManager::loadLegacyFlags(const QString& baseDir)
+{
+    const QString legacyDir = QDir(baseDir).filePath("legacy");
+    if (!QDir(legacyDir).exists()) {
+        qWarning() << "[FlagManager] Legacy-Verzeichnis fehlt:" << legacyDir;
+        return false;
+    }
+
+    const QString wndFile  = QDir(legacyDir).filePath("window_flags_legacy.json");
+    const QString ctrlFile = QDir(legacyDir).filePath("control_flags_legacy.json");
+
+    m_legacyWindowFlags  = loadFlagFile(wndFile);
+    m_legacyControlFlags = loadFlagFile(ctrlFile);
+
+    return !(m_legacyWindowFlags.isEmpty() && m_legacyControlFlags.isEmpty());
+}
+
+// ===========================================================
+// Umschalten zwischen Modern und Legacy
+// ===========================================================
+bool FlagManager::useLegacyMode(bool enabled)
+{
+    m_useLegacy = enabled;
+
+    if (enabled) {
+        qInfo() << "[FlagManager] Legacy-Mode aktiviert: Verwende alte Flag-Dateien.";
+        m_windowFlags  = m_legacyWindowFlags;
+        m_controlFlags = m_legacyControlFlags;
+    } else {
+        qInfo() << "[FlagManager] Legacy-Mode deaktiviert: Verwende aktuelle Flags.";
+    }
+
+    return true;
+}
+
+void FlagManager::saveFlags(const QString& configDir)
+{
+    const QString normalPath = configDir + "/window_flags.json";
+    const QString legacyPath = configDir + "/legacy_window_flags.json";
+
+    saveJsonFile(normalPath, m_windowFlags, "Window");
+    saveJsonFile(legacyPath, m_legacyWindowFlags, "Legacy");
+
+    qInfo().noquote() << QString("[FlagManager] Flags gespeichert → Active:%1 | Legacy:%2")
+                             .arg(m_windowFlags.size())
+                             .arg(m_legacyWindowFlags.size());
 }

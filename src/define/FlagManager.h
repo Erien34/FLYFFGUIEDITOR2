@@ -24,15 +24,11 @@ class FlagManager : public QObject
 public:
     explicit FlagManager(ConfigManager* config = nullptr);
 
-    /**
-     * @brief Startet die Flaggenerierung:
-     *        - durchsucht alle Header-Dateien im Source-Ordner
-     *        - parst #define-Makros
-     *        - speichert JSON-Dateien in den angegebenen Pfaden
-     *
-     * @param wndPath Pfad zur window_flags.json
-     * @param ctrlPath Pfad zur control_flags.json
-     */
+    bool loadLegacyFlags(const QString& baseDir);
+    bool useLegacyMode(bool enabled);
+    const QMap<QString, QString>& legacyWindowFlags() const { return m_legacyWindowFlags; }
+    const QMap<QString, QString>& legacyControlFlags() const { return m_legacyControlFlags; }
+
     void generateFlags(const QString& sourceDir,
                         const QString& wndPath,
                         const QString& ctrlPath);
@@ -53,6 +49,7 @@ private:
     void applyDefaultControlFlags();
 
     /// speichert beliebige Key/Value-Maps als JSON
+    void saveFlags(const QString& configDir);
     void saveJsonFile(const QString& path, const QMap<QString, QString>& data, const QString& label);
 
 private:
@@ -65,5 +62,10 @@ private:
     QMap<QString, QString> m_controlFlags;  ///< z. B. WLVS_*, EBS_*, WIDC_*
     QMap<QString, QString> m_windowTypes;   ///< z. B. WTYPE_BASE, WTYPE_BUTTON etc.
     QMap<QString, QString> m_unknownFlags;
+    QMap<QString, QString> m_legacyWindowFlags;
+    QMap<QString, QString> m_legacyControlFlags;
+    QStringList m_legacyOverrides;
+
+    bool m_useLegacy = false;
 };
 
