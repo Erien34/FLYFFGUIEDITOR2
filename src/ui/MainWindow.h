@@ -3,13 +3,19 @@
 #include <QMainWindow>
 #include <QJsonObject>
 
-#include "editor/CanvasHandler.h"
+#include "CanvasHandler.h"
 
 class ProjectController;
 class LayoutManager;
+
+class Canvas;
+class CanvasHandler;
+
 class PropertyPanel;
 class WindowPanel;
+
 struct WindowData;
+
 
 /**
  * @brief Hauptfenster des FlyFF GUI Editors.
@@ -33,6 +39,7 @@ private:
     ProjectController* m_controller = nullptr;
     WindowPanel* m_windowPanel = nullptr;
     PropertyPanel* m_propertyPanel = nullptr;
-    CanvasHandler* m_canvasHandler = nullptr;
+    CanvasHandler* m_handler;
+    Canvas* m_canvas;
 
 };

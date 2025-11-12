@@ -22,7 +22,7 @@ void GuiRenderer::setThemeColor(const QColor& accent)
 // Gesamtes Layout rendern (alle Fenster & Controls)
 // ------------------------------------------------------------
 void GuiRenderer::render(QPainter& painter,
-                         const std::vector<std::shared_ptr<WindowData>>& windows,
+                         const std::vector<std::shared_ptr<WindowData>>& allWindows,
                          const QMap<QString, QPixmap>& themes,
                          const QSize& canvasSize)
 {
@@ -30,12 +30,34 @@ void GuiRenderer::render(QPainter& painter,
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    for (const auto& wnd : windows)
-    {
-        if (!wnd || !wnd->valid)
-            continue;
+    // 🧭 1️⃣ Welche Fenster?
+    std::vector<std::shared_ptr<WindowData>> targets;
 
-        renderWindow(painter, wnd, themes, canvasSize);
+    if (m_renderMode == RenderMode::ActiveOnly) {
+        if (m_activeWindow)
+            targets.push_back(m_activeWindow);
+    } else {
+        targets = allWindows;
+    }
+
+    // 🖼️ 2️⃣ Rendern
+    for (const auto& wnd : targets) {
+        if (!wnd || !wnd->valid) continue;
+
+        RenderWindow::renderWindow(painter, wnd, themes, canvasSize);
+
+        for (const auto& ctrl : wnd->controls) {
+            if (!ctrl || !ctrl->valid) continue;
+
+            QRect rect(ctrl->x1, ctrl->y1, ctrl->x2 - ctrl->x1, ctrl->y2 - ctrl->y1);
+            RenderControls::renderControl(painter, rect, ctrl, themes, ControlState::Normal);
+        }
+    }
+
+    // 🧩 3️⃣ Optional: Mode-Overlay (debug/preview)
+    if (m_renderMode == RenderMode::AllWindows) {
+        painter.setPen(QColor(200, 200, 200));
+        painter.drawText(10, 20, "[Preview Mode – Alle Fenster]");
     }
 
     painter.restore();

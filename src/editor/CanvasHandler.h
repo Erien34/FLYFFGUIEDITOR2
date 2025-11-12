@@ -1,24 +1,29 @@
 #pragma once
+#include "WindowData.h"
 #include <QObject>
-#include <memory>
 
 class ProjectController;
+class QMouseEvent;
+class QKeyEvent;
 class Canvas;
-struct WindowData;
 
-class CanvasHandler : public QObject
-{
+class CanvasHandler : public QObject {
     Q_OBJECT
 public:
-    explicit CanvasHandler(ProjectController* controller, QObject* parent = nullptr);
+    CanvasHandler(Canvas* canvas, ProjectController* controller);
 
-    Canvas* canvas() const;
+    Canvas* canvas() const { return m_canvas; }
+
+    // void onMousePress(QMouseEvent* event);
+    // void onMouseMove(QMouseEvent* event);
+    // void onMouseRelease(QMouseEvent* event);
+    // void onKeyPress(QKeyEvent* event);
+    // void onKeyRelease(QKeyEvent* event);
 
 public slots:
     void showWindow(const std::shared_ptr<WindowData>& wnd);
     void onActiveWindowChanged(const std::shared_ptr<WindowData>& wnd);
-
 private:
-    ProjectController* m_controller = nullptr;
-    Canvas* m_canvas = nullptr;
+    Canvas* m_canvas;
+    ProjectController* m_controller;
 };

@@ -1,33 +1,15 @@
 #include "CanvasHandler.h"
+#include "ProjectController.h"
 #include "Canvas.h"
-#include "core/ProjectController.h"
-#include "layout/LayoutManager.h"
-#include "layout/model/WindowData.h"
-
+#include <QMouseEvent>
+#include <QKeyEvent>
 #include <QDebug>
 
-CanvasHandler::CanvasHandler(ProjectController* controller, QObject* parent)
-    : QObject(parent), m_controller(controller)
+CanvasHandler::CanvasHandler(Canvas* canvas, ProjectController* controller)
+    : QObject(nullptr),
+    m_canvas(canvas),
+    m_controller(controller)
 {
-    if (!m_controller) {
-        qCritical() << "[CanvasHandler] Kein gültiger Controller!";
-        return;
-    }
-
-    auto* lm = m_controller->layoutManager();
-    if (!lm) {
-        qCritical() << "[CanvasHandler] Kein LayoutManager im Controller gefunden!";
-        return;
-    }
-
-    // 🔹 Canvas erzeugen mit Controller + LayoutManager
-    m_canvas = new Canvas(m_controller, lm, nullptr);
-    qInfo() << "[CanvasHandler] Canvas erfolgreich erstellt.";
-}
-
-Canvas* CanvasHandler::canvas() const
-{
-    return m_canvas;
 }
 
 void CanvasHandler::showWindow(const std::shared_ptr<WindowData>& wnd)
@@ -44,3 +26,9 @@ void CanvasHandler::onActiveWindowChanged(const std::shared_ptr<WindowData>& wnd
 {
     showWindow(wnd);
 }
+
+// void CanvasHandler::onMousePress(QMouseEvent* event)  { qDebug() << "Mouse Press" << event->pos(); }
+// void CanvasHandler::onMouseMove(QMouseEvent* event)   { qDebug() << "Mouse Move" << event->pos(); }
+// void CanvasHandler::onMouseRelease(QMouseEvent* event){ qDebug() << "Mouse Release" << event->pos(); }
+// void CanvasHandler::onKeyPress(QKeyEvent* event)      { qDebug() << "Key Press:" << event->key(); }
+// void CanvasHandler::onKeyRelease(QKeyEvent* event)    { qDebug() << "Key Release:" << event->key(); }

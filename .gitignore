@@ -41,3 +41,4 @@ Makefile
 
 # ---- Eigene Ordner ausschließen ----
 /TEST/
+/dump/

@@ -1,12 +1,11 @@
 #include "core/ProjectController.h"
 #include "core/ConfigManager.h"
 #include "core/FileManager.h"
-#include "defines/DefineBackend.h"
-#include "defines/DefineManager.h"
-#include "defines/FlagManager.h"
-#include "defines/BehaviorManager.h"
-#include "texts/TextBackend.h"
-#include "texts/TextManager.h"
+#include "define/DefineBackend.h"
+#include "define/DefineManager.h"
+#include "define/FlagManager.h"
+#include "text/TextBackend.h"
+#include "text/TextManager.h"
 #include "layout/LayoutParser.h"
 #include "layout/LayoutBackend.h"
 #include "utils/ResourceUtils.h"
@@ -14,6 +13,9 @@
 #include "editor/CanvasHandler.h"
 #include "ui/WindowPanel.h"
 #include "ui/PropertyPanel.h"
+#include "render/RenderManager.h"
+#include "theme/ThemeManager.h"
+#include "behavior/BehaviorManager.h"
 
 
 #include <QFileDialog>
@@ -31,21 +33,25 @@ ProjectController::ProjectController(QObject* parent)
     m_configManager(std::make_unique<ConfigManager>()),
     m_fileManager(std::make_unique<FileManager>(m_configManager.get())),
     m_layoutParser(std::make_unique<LayoutParser>()),
-    m_layoutBackend(std::make_unique<LayoutBackend>(*m_fileManager, *m_layoutParser )),
+    m_layoutBackend(std::make_unique<LayoutBackend>(*m_fileManager, *m_layoutParser)),
     m_defineManager(std::make_unique<DefineManager>()),
     m_defineBackend(std::make_unique<DefineBackend>()),
     m_flagManager(std::make_unique<FlagManager>(m_configManager.get())),
     m_textManager(std::make_unique<TextManager>()),
     m_textBackend(std::make_unique<TextBackend>()),
     m_layoutManager(std::make_unique<LayoutManager>(*m_layoutParser, *m_layoutBackend)),
+
+    // --- neue Grafik-Komponenten ---
+    m_themeManager(std::make_unique<ThemeManager>()),
     m_behaviorManager(std::make_unique<BehaviorManager>(
         m_flagManager.get(),
         m_textManager.get(),
         m_defineManager.get(),
         m_layoutManager.get(),
-        m_layoutBackend.get()))
-
-
+        m_layoutBackend.get())),
+    m_renderManager(std::make_unique<RenderManager>(
+        m_themeManager.get(),
+        m_behaviorManager.get()))
 {
     connect(m_layoutManager.get(), &LayoutManager::tokensReady,
             this, &ProjectController::onTokensReady);
@@ -386,11 +392,11 @@ void ProjectController::selectControl(const QString& windowName, const QString& 
     emit selectionChanged();
 }
 
-void ProjectController::bindCanvas(CanvasHandler* handler)
-{
-    connect(this, &ProjectController::activeWindowChanged,
-            handler, &CanvasHandler::onActiveWindowChanged);
-}
+ void ProjectController::bindCanvas(CanvasHandler* handler)
+ {
+     connect(this, &ProjectController::activeWindowChanged,
+             handler, &CanvasHandler::onActiveWindowChanged);
+ }
 
 void ProjectController::bindPanels(WindowPanel* windowPanel, PropertyPanel* propertyPanel)
 {

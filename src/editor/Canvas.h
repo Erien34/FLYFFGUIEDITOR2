@@ -1,39 +1,32 @@
 #pragma once
+#include "WindowData.h"
 #include <QWidget>
-#include <memory>
-
-#include "layout/model/WindowData.h"
 
 class ProjectController;
-class LayoutManager;
-class GuiRenderer;   // NEU
+class RenderManager;
+class CanvasHandler;
 
-enum class RenderMode {
-    ActiveOnly,
-    AllWindows
-};
 
-class Canvas : public QWidget
-{
+class Canvas : public QWidget {
     Q_OBJECT
-
 public:
-    explicit Canvas(ProjectController* controller, LayoutManager* lm, QWidget* parent = nullptr);
+    explicit Canvas(ProjectController* controller, QWidget* parent = nullptr);
+    ~Canvas();
 
     void setActiveWindow(const std::shared_ptr<WindowData>& wnd);
-    void setRenderMode(RenderMode mode);
-    RenderMode renderMode() const { return m_renderMode; }
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    // void mousePressEvent(QMouseEvent* event) override;
+    // void mouseMoveEvent(QMouseEvent* event) override;
+    // void mouseReleaseEvent(QMouseEvent* event) override;
+    // void keyPressEvent(QKeyEvent* event) override;
+    // void keyReleaseEvent(QKeyEvent* event) override;
 
 private:
-    ProjectController*              m_controller = nullptr;
-    LayoutManager*                  m_layoutManager = nullptr;
-    std::shared_ptr<WindowData>     m_activeWindow;
-    RenderMode                      m_renderMode = RenderMode::ActiveOnly;
+    ProjectController* m_controller =nullptr;
+    RenderManager* m_renderManager =nullptr;
+    CanvasHandler* m_handler =nullptr;
 
-    std::unique_ptr<GuiRenderer>    m_renderer;   // NEU
-
-    void drawBackground(QPainter& p);
+    std::shared_ptr<WindowData> m_activeWindow;
 };

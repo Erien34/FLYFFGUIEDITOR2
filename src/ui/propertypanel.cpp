@@ -1,6 +1,6 @@
 #include "PropertyPanel.h"
 #include "core/ProjectController.h"
-#include "defines/BehaviorManager.h"
+#include "behavior/BehaviorManager.h"
 #include "layout/model/WindowData.h"
 #include "layout/model/ControlData.h"
 

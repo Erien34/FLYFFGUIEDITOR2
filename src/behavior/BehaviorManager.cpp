@@ -1,8 +1,7 @@
-#include "defines/BehaviorManager.h"
-
-#include "defines/FlagManager.h"
-#include "defines/DefineManager.h"
-#include "texts/TextManager.h"
+#include "BehaviorManager.h"
+#include "define/FlagManager.h"
+#include "define/DefineManager.h"
+#include "text/TextManager.h"
 #include "layout/LayoutManager.h"
 #include "layout/LayoutBackend.h"
 #include "layout/model/WindowData.h"

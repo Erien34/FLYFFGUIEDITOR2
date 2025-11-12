@@ -1,27 +1,43 @@
 #include "Canvas.h"
-#include "core/ProjectController.h"
-#include "layout/LayoutManager.h"
-#include "layout/model/ControlData.h"
-
-#include "renderer/GuiRenderer.h"
-
+#include "RenderManager.h"
+#include "CanvasHandler.h"
+#include "ProjectController.h"
+#include "WindowData.h"
 #include <QPainter>
-#include <QPaintEvent>
 #include <QDebug>
 
-Canvas::Canvas(ProjectController* controller, LayoutManager* lm, QWidget* parent)
+Canvas::Canvas(ProjectController* controller, QWidget* parent)
     : QWidget(parent),
     m_controller(controller),
-    m_layoutManager(lm)
+    m_renderManager(controller ? controller->renderManager() : nullptr),
+    m_handler(new CanvasHandler(this, controller))
 {
-    setMinimumSize(600, 400);
-    setAutoFillBackground(false);
-    setAttribute(Qt::WA_OpaquePaintEvent);
-    setAttribute(Qt::WA_NoSystemBackground);
+    setMinimumSize(800, 600);
     setMouseTracking(true);
 
-    // GuiRenderer ohne BehaviorManager – kann später nachgerüstet werden
-    m_renderer = std::make_unique<GuiRenderer>(nullptr, this);
+    if (m_renderManager) {
+        connect(m_renderManager, &RenderManager::requestRepaint,
+                this, QOverload<>::of(&Canvas::update));
+    }
+
+    qInfo() << "[Canvas] Initialized with RenderManager:"
+            << (m_renderManager ? "OK" : "null");
+}
+
+Canvas::~Canvas()
+{
+    delete m_handler;
+}
+
+void Canvas::paintEvent(QPaintEvent*)
+{
+    QPainter painter(this);
+    painter.fillRect(rect(), QColor(45, 45, 45));
+
+    if (m_renderManager)
+        m_renderManager->render(painter, size());
+    else
+        painter.drawText(rect(), Qt::AlignCenter, "RenderManager nicht verfügbar");
 }
 
 void Canvas::setActiveWindow(const std::shared_ptr<WindowData>& wnd)
@@ -30,79 +46,8 @@ void Canvas::setActiveWindow(const std::shared_ptr<WindowData>& wnd)
     update();
 }
 
-void Canvas::setRenderMode(RenderMode mode)
-{
-    if (m_renderMode == mode)
-        return;
-    m_renderMode = mode;
-    update();
-}
-
-// ======================================================
-// Hintergrund (Gitter, neutraler Hintergrund)
-// ======================================================
-void Canvas::drawBackground(QPainter& p)
-{
-    p.fillRect(rect(), QColor(35, 35, 40));
-
-    const int gridSize = 16;
-    p.setPen(QColor(50, 50, 55));
-
-    for (int x = 0; x < width(); x += gridSize)
-        p.drawLine(x, 0, x, height());
-    for (int y = 0; y < height(); y += gridSize)
-        p.drawLine(0, y, width(), y);
-}
-
-// ======================================================
-// Haupt-Rendering
-// ======================================================
-void Canvas::paintEvent(QPaintEvent* event)
-{
-    Q_UNUSED(event);
-    QPainter p(this);
-    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
-
-    drawBackground(p);
-
-    if (!m_layoutManager || !m_controller) {
-        p.setPen(Qt::white);
-        p.drawText(rect(), Qt::AlignCenter, "Fehlender Controller oder LayoutManager");
-        return;
-    }
-
-    const auto& themes = m_controller->themes();
-    if (themes.isEmpty()) {
-        p.setPen(Qt::darkGray);
-        p.drawText(rect(), Qt::AlignCenter, "Kein Theme geladen");
-        return;
-    }
-
-    if (!m_renderer) {
-        p.setPen(Qt::red);
-        p.drawText(rect(), Qt::AlignCenter, "GuiRenderer nicht initialisiert");
-        return;
-    }
-
-    // Nur aktives Fenster
-    if (m_renderMode == RenderMode::ActiveOnly) {
-        if (!m_activeWindow) {
-            p.setPen(Qt::white);
-            p.drawText(rect(), Qt::AlignCenter, "Kein Fenster ausgewählt");
-            return;
-        }
-
-        std::vector<std::shared_ptr<WindowData>> single{ m_activeWindow };
-        m_renderer->render(p, single, themes, size());
-        return;
-    }
-
-    // Alle Fenster rendern
-    if (m_renderMode == RenderMode::AllWindows) {
-        const auto& windows = m_layoutManager->processedWindows();
-        m_renderer->render(p, windows, themes, size());
-
-        p.setPen(QColor(200, 200, 200));
-        p.drawText(10, 20, "[Preview Mode – Alle Fenster]");
-    }
-}
+// void Canvas::mousePressEvent(QMouseEvent* event) { m_handler->onMousePress(event); }
+// void Canvas::mouseMoveEvent(QMouseEvent* event) { m_handler->onMouseMove(event); }
+// void Canvas::mouseReleaseEvent(QMouseEvent* event) { m_handler->onMouseRelease(event); }
+// void Canvas::keyPressEvent(QKeyEvent* event) { m_handler->onKeyPress(event); }
+// void Canvas::keyReleaseEvent(QKeyEvent* event) { m_handler->onKeyRelease(event); }

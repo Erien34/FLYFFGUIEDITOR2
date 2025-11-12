@@ -11,6 +11,7 @@
 #include "layout/model/WindowData.h"
 #include "layout/model/ControlData.h"
 #include "renderer/ControlState.h"
+#include "renderer/RenderMode.h"
 
 // Forward-Decl – tatsächliche Definition steht in defines/BehaviorManager.h
 class BehaviorManager;
@@ -40,6 +41,8 @@ public:
 private:
     BehaviorManager* m_behaviorMgr = nullptr;
     QColor m_themeColor = QColor(255, 255, 255);
+    RenderMode m_renderMode = RenderMode::ActiveOnly;
+    std::shared_ptr<WindowData> m_activeWindow;
 
     void renderWindow(QPainter& p,
                       const std::shared_ptr<WindowData>& wnd,

@@ -14,13 +14,15 @@
 #include "FileManager.h"
 #include "layout/LayoutParser.h"
 #include "layout/LayoutBackend.h"
-#include "defines/DefineManager.h"
-#include "defines/DefineBackend.h"
-#include "defines/BehaviorManager.h"
-#include "defines/FlagManager.h"
-#include "texts/TextManager.h"
-#include "texts/TextBackend.h"
+#include "define/DefineManager.h"
+#include "define/DefineBackend.h"
+#include "define/FlagManager.h"
+#include "text/TextManager.h"
+#include "text/TextBackend.h"
 #include "layout/LayoutManager.h"
+#include "render/RenderManager.h"
+#include "theme/ThemeManager.h"
+#include "behavior/BehaviorManager.h"
 
 class ProjectController : public QObject
 {
@@ -41,6 +43,8 @@ public:
     LayoutManager* layoutManager() const { return m_layoutManager.get(); }
     TextManager* textManager() const { return m_textManager.get(); }
     BehaviorManager* behaviorManager() const { return m_behaviorManager.get(); }
+    RenderManager* renderManager() const { return m_renderManager.get(); }
+    ThemeManager* themeManager() const { return m_themeManager.get(); }
 
     std::shared_ptr<WindowData>  currentWindow() const { return m_currentWindow; }
     std::shared_ptr<ControlData> currentControl() const { return m_currentControl; }
@@ -86,6 +90,8 @@ private:
     std::unique_ptr<TextBackend>    m_textBackend;
     std::unique_ptr<LayoutManager>  m_layoutManager;
     std::unique_ptr<BehaviorManager> m_behaviorManager;
+    std::unique_ptr<RenderManager> m_renderManager;
+    std::unique_ptr<ThemeManager>  m_themeManager;
 
     // 🔧 Ressourcen
     QMap<QString, QIcon>   m_icons;

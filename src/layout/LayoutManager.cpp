@@ -1,7 +1,7 @@
 #include "LayoutManager.h"
 
 #include "LayoutBackend.h"
-#include "defines/BehaviorManager.h"
+#include "behavior/BehaviorManager.h"
 #include "model/TokenData.h"   // ggf. Pfad anpassen
 #include "model/WindowData.h"
 #include "model/ControlData.h"

@@ -8,7 +8,7 @@
 #include "utils/BaseManager.h"
 #include "layout/model/TokenData.h"
 
-class WindowData;
+struct WindowData;
 
 // ------------------------------------------------------------
 // DefineManager

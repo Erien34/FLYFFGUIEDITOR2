@@ -1,22 +1,23 @@
-cmake_minimum_required(VERSION 3.22)
-project(FlyffGuiEditor LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.20)
 
-# -----------------------------------------
-# 🔧 Compiler / Qt-Basiskonfiguration
-# -----------------------------------------
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+project(FLYFFGUIEDITOR2 LANGUAGES CXX)
 
+# ============================================================
+# 🧱 1. QT & Compiler Setup
+# ============================================================
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.9 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
-# -----------------------------------------
-# 🧩 Projektstruktur
-# -----------------------------------------
+# ============================================================
+# 📂 2. Quellcode-Gruppen
+# ============================================================
+
+# ---- Core ----
 set(SRC_CORE
     src/core/ProjectController.cpp
     src/core/ProjectController.h
@@ -26,31 +27,7 @@ set(SRC_CORE
     src/core/FileManager.h
 )
 
-set(SRC_LAYOUT
-    src/layout/LayoutBackend.cpp
-    src/layout/LayoutBackend.h
-    src/layout/LayoutManager.cpp
-    src/layout/LayoutManager.h
-    src/layout/LayoutParser.cpp
-    src/layout/LayoutParser.h
-)
-
-set(SRC_DEFINES
-    src/defines/DefineBackend.cpp
-    src/defines/DefineBackend.h
-    src/defines/DefineManager.cpp
-    src/defines/DefineManager.h
-    src/defines/FlagManager.cpp
-    src/defines/FlagManager.h
-)
-
-set(SRC_TEXTS
-    src/texts/TextBackend.cpp
-    src/texts/TextBackend.h
-    src/texts/TextManager.cpp
-    src/texts/TextManager.h
-)
-
+# ---- Editor ----
 set(SRC_EDITOR
     src/editor/Canvas.cpp
     src/editor/Canvas.h
@@ -58,6 +35,67 @@ set(SRC_EDITOR
     src/editor/CanvasHandler.h
 )
 
+# ---- Render ----
+set(SRC_RENDER
+    src/render/RenderManager.cpp
+    src/render/RenderManager.h
+    src/render/RenderWindow.cpp
+    src/render/RenderWindow.h
+    src/render/RenderControls.cpp
+    src/render/RenderControls.h
+    src/render/RenderMode.h
+    src/render/ControlState.h
+)
+
+# ---- Theme ----
+set(SRC_THEME
+    src/theme/ThemeManager.cpp
+    src/theme/ThemeManager.h
+    src/theme/ThemeDefinition.h
+)
+
+# ---- Behavior ----
+set(SRC_BEHAVIOR
+    src/behavior/BehaviorManager.cpp
+    src/behavior/BehaviorManager.h
+)
+
+# ---- Layout ----
+set(SRC_LAYOUT
+    src/layout/LayoutParser.cpp
+    src/layout/LayoutParser.h
+    src/layout/LayoutBackend.cpp
+    src/layout/LayoutBackend.h
+    src/layout/LayoutManager.cpp
+    src/layout/LayoutManager.h
+)
+
+# ---- Layout Models ----
+set(SRC_LAYOUT_MODEL
+    src/layout/model/WindowData.h
+    src/layout/model/ControlData.h
+    src/layout/model/TokenData.h
+)
+
+# ---- Defines ----
+set(SRC_DEFINE
+    src/define/DefineManager.cpp
+    src/define/DefineManager.h
+    src/define/DefineBackend.cpp
+    src/define/DefineBackend.h
+    src/define/FlagManager.cpp
+    src/define/FlagManager.h
+)
+
+# ---- Text ----
+set(SRC_TEXT
+    src/text/TextManager.cpp
+    src/text/TextManager.h
+    src/text/TextBackend.cpp
+    src/text/TextBackend.h
+)
+
+# ---- UI ----
 set(SRC_UI
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
@@ -67,6 +105,7 @@ set(SRC_UI
     src/ui/PropertyPanel.h
 )
 
+# ---- Utils ----
 set(SRC_UTILS
     src/utils/BaseManager.cpp
     src/utils/BaseManager.h
@@ -74,68 +113,84 @@ set(SRC_UTILS
     src/utils/ResourceUtils.h
 )
 
-set(SRC_MAIN src/main.cpp)
+# ---- Main ----
+set(SRC_MAIN
+    src/main.cpp
+)
 
-# -----------------------------------------
-# 🔗 Alle Dateien zusammenfassen
-# -----------------------------------------
+# ============================================================
+# 🧩 3. Zusammenführen aller Quellen
+# ============================================================
 set(SRC_FILES
     ${SRC_CORE}
-    ${SRC_LAYOUT}
-    ${SRC_DEFINES}
-    ${SRC_TEXTS}
     ${SRC_EDITOR}
-    ${SRC_UI}
+    ${SRC_RENDER}
+    ${SRC_THEME}
+    ${SRC_BEHAVIOR}
     ${SRC_UTILS}
+    ${SRC_LAYOUT}
+    ${SRC_LAYOUT_MODEL}
+    ${SRC_DEFINE}
+    ${SRC_TEXT}
+    ${SRC_UI}
     ${SRC_MAIN}
 )
 
-# -----------------------------------------
-# 📦 Executable erzeugen
-# -----------------------------------------
-add_executable(${PROJECT_NAME} ${SRC_FILES}
+# ============================================================
+# ⚙️ 4. Executable & Includes
+# ============================================================
+add_executable(${PROJECT_NAME} ${SRC_FILES})
 
-    src/utils/RenderPreview.h
-    src/layout/model/ControlData.h src/layout/model/TokenData.h src/layout/model/WindowData.h
-    src/renderer/RenderControls.cpp src/renderer/RenderControls.h src/renderer/RenderWindow.cpp src/renderer/RenderWindow.h
-    src/defines/BehaviorManager.h src/defines/BehaviorManager.cpp
-    src/renderer/GuiRenderer.h src/renderer/GuiRenderer.cpp
-    src/renderer/ControlState.h)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    src
+    src/core
+    src/editor
+    src/render
+    src/theme
+    src/behavior
+    src/utils
+    src/layout
+    src/layout/model
+    src/define
+    src/text
+    src/ui
+)
 
-# -----------------------------------------
-# 🔗 Mit Qt-Bibliotheken verknüpfen
-# -----------------------------------------
+# ============================================================
+# 🔗 5. Qt Libraries
+# ============================================================
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
 )
 
-# -----------------------------------------
-# 🧭 Includepfade
-# -----------------------------------------
-target_include_directories(${PROJECT_NAME} PRIVATE
-    src
-    src/core
-    src/layout
-    src/defines
-    src/texts
-    src/editor
-    src/ui
-    src/utils
-)
+# ============================================================
+# 🧭 6. IDE-Gruppierung (optional)
+# ============================================================
+source_group("Core" FILES ${SRC_CORE})
+source_group("Editor" FILES ${SRC_EDITOR})
+source_group("Render" FILES ${SRC_RENDER})
+source_group("Theme" FILES ${SRC_THEME})
+source_group("Behavior" FILES ${SRC_BEHAVIOR})
+source_group("Layout" FILES ${SRC_LAYOUT})
+source_group("Layout/Model" FILES ${SRC_LAYOUT_MODEL})
+source_group("Defines" FILES ${SRC_DEFINE})
+source_group("Text" FILES ${SRC_TEXT})
+source_group("UI" FILES ${SRC_UI})
+source_group("Utils" FILES ${SRC_UTILS})
+source_group("Main" FILES ${SRC_MAIN})
 
-# -----------------------------------------
-# 🧱 Windows-spezifische Libraries
-# -----------------------------------------
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE
-        user32.lib
-        gdi32.lib
-        shell32.lib
-        ole32.lib
-        uuid.lib
-        comdlg32.lib
-        advapi32.lib
-    )
+# ============================================================
+# ⚡ 7. Compiler Warnungen
+# ============================================================
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# ============================================================
+# 🧹 8. Optionale Ordner ausschließen
+# ============================================================
+# add_subdirectory(src/dump)  # Alte Dateien ignorieren
