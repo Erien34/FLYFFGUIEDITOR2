@@ -37,4 +37,5 @@ struct WindowData {
     int sourceLine = -1;          // Zeilennummer in resdata.inc, an der das Fenster beginnt
     QString rawHeader;            // Originaltextzeile des Fensters (z. B. "APP_CONFIRM_BUY ...")
     bool isCorrupted = false;
+    BehaviorInfo behavior;
 };

@@ -82,13 +82,27 @@ void LayoutManager::refreshFromParser()
                 QString clean = win->flagsHex.trimmed().toUpper();
                 if (clean.startsWith("0X")) clean.remove(0, 2);
                 if (clean.endsWith("L"))   clean.chop(1);
+
                 win->flagsMask = clean.toUInt(&ok, 16);
-                if (!ok)
-                {
+
+                if (!ok) {
                     win->flagsMask = 0;
                     qWarning().noquote()
                         << "[LayoutManager] Ungültiger Window-Flagwert:"
                         << win->flagsHex << "bei" << win->name;
+                }
+
+                // -------------------------------------------------
+                // 🛠 AUTO-FIX: kaputte Fensterflags hochschiften
+                // -------------------------------------------------
+                if (win->flagsMask > 0 && win->flagsMask < 0x10000)
+                {
+                    qWarning().noquote()
+                    << "[LayoutManager] Auto-Fix → Window" << win->name
+                    << "hat LOW-Flag 0x" + QString::number(win->flagsMask,16)
+                    << "→ shift nach HIGH.";
+
+                    win->flagsMask <<= 16;
                 }
             }
         }
@@ -146,11 +160,24 @@ void LayoutManager::refreshFromParser()
 
                 bool ok = false;
                 QString clean = ctrl->flagsHex.trimmed().toUpper();
-                if (clean.startsWith("0X")) clean.remove(0, 2);
-                if (clean.endsWith("L"))   clean.chop(1);
+
+                // Präfixe entfernen
+                if (clean.startsWith("0X"))
+                    clean.remove(0, 2);
+                if (clean.endsWith("L"))
+                    clean.chop(1);
+
+                // In uint32 parsen
                 ctrl->flagsMask = clean.toUInt(&ok, 16);
                 if (!ok)
+                {
                     ctrl->flagsMask = 0;
+                }
+
+                // --- Flags zerlegen ---
+                ctrl->lowFlags  =  ctrl->flagsMask        & 0x0000FFFF;
+                ctrl->midFlags  = (ctrl->flagsMask >> 16) & 0x000000FF;
+                ctrl->highFlags = (ctrl->flagsMask >> 24) & 0x000000FF;
             }
 
             if (p.size() >= 10) ctrl->mod1 = p[9].toInt();
@@ -159,8 +186,6 @@ void LayoutManager::refreshFromParser()
             if (p.size() >= 13) ctrl->mod4 = p[12].toInt();
 
             // --- Farbe ---
-            // Falls 3 echte RGB-Werte (0–255) vorhanden sind → direkt nutzen,
-            // sonst ersten Wert als 24-Bit-RGB-Integer (packed) interpretieren.
             if (p.size() >= 16)
             {
                 bool okR = false, okG = false, okB = false;
@@ -173,12 +198,10 @@ void LayoutManager::refreshFromParser()
                     v2 >= 0 && v2 <= 255 &&
                     v3 >= 0 && v3 <= 255)
                 {
-                    // klassisches R,G,B
                     ctrl->color = QColor(v1, v2, v3);
                 }
                 else
                 {
-                    // kombinierter Farbwert in v1 (kann negativ sein)
                     bool okPacked = false;
                     int packed    = p[13].toInt(&okPacked);
                     if (okPacked)
@@ -233,6 +256,7 @@ void LayoutManager::refreshFromParser()
                .arg(m_windows.size());
 }
 
+
 // -------------------------------------------------------------
 // Layout verarbeiten (ruft BehaviorManager)
 // -------------------------------------------------------------
@@ -240,31 +264,37 @@ void LayoutManager::processLayout()
 {
     qInfo() << "[LayoutManager] Verarbeite Layouts...";
 
-    if (!m_behavior)
+    if (!m_behaviorManager)
     {
         qWarning() << "[LayoutManager] Kein BehaviorManager zugewiesen!";
         return;
     }
 
-    // Fenster & Controls validieren
     for (auto& wndPtr : m_windows)
     {
         if (!wndPtr) continue;
 
-        m_behavior->validateWindowFlags(wndPtr.get());
+        // 1) Window-Flags validieren
+        m_behaviorManager->validateWindowFlags(wndPtr.get());
 
+        // 2) BehaviorInfo für Fenster erzeugen
+        wndPtr->behavior = m_behaviorManager->resolveBehavior(*wndPtr);
+
+        // 3) Controls
         for (auto& ctrlPtr : wndPtr->controls)
         {
-            if (ctrlPtr)
-                m_behavior->validateControlFlags(ctrlPtr.get());
+            if (!ctrlPtr) continue;
+
+            m_behaviorManager->validateControlFlags(ctrlPtr.get());
+            ctrlPtr->behavior = m_behaviorManager->resolveBehavior(*ctrlPtr);
         }
     }
 
     // Nachgelagerte Analysen
-    m_behavior->analyzeControlTypes(m_windows);
-    m_behavior->generateUnknownControls(m_windows);
+    m_behaviorManager->analyzeControlTypes(m_windows);
+    m_behaviorManager->generateUnknownControls(m_windows);
 
-    qInfo() << "[LayoutManager] Validierung abgeschlossen.";
+    qInfo() << "[LayoutManager] Validierung & Behavior-Zuordnung abgeschlossen.";
 }
 
 // -------------------------------------------------------------

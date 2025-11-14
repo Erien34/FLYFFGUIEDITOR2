@@ -1,12 +1,9 @@
 #pragma once
 #include <QString>
 #include <QStringList>
-#include <memory>
-
-#pragma once
-#include <QString>
-#include <QStringList>
 #include <QColor>
+
+#include "BehaviorManager.h"
 
 enum ButtonState {
     Normal,
@@ -54,7 +51,14 @@ struct ControlData
     quint32 flagsMask = 0;             // Effektive Bitmaske
     QVector<QString> resolvedMask;     // Einzel gesetzte Flags
 
+    // --- Zerlegte Flags ---
+    quint32 lowFlags  = 0;   // 0–15  → ControlFlags.json
+    quint32 midFlags  = 0;   // 16–23 → Engine / Behavior reserved bits
+    quint32 highFlags = 0;   // 24–31 → Render / Script reserved bits
+
     bool disabled = false;
     bool isPressed = false;
     bool isHovered = false;
+
+    BehaviorInfo behavior;
 };

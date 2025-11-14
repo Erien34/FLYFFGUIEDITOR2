@@ -53,9 +53,9 @@ ProjectController::ProjectController(QObject* parent)
         m_themeManager.get(),
         m_behaviorManager.get()))
 {
+    m_layoutManager->setBehaviorManager(m_behaviorManager.get());
     connect(m_layoutManager.get(), &LayoutManager::tokensReady,
             this, &ProjectController::onTokensReady);
-    qInfo() << "[ProjectController] Initialisiert";
 }
 
 void ProjectController::onTokensReady()
@@ -72,21 +72,9 @@ void ProjectController::onTokensReady()
     for (const auto& list : tokenMap)
         flatTokens.append(list);
 
-    // 3) LayoutManager übernimmt Tokens direkt aus dem Singleton
+    // 3) LayoutManager übernimmt Tokens + verarbeitet Layouts inkl. Behavior
     {
-        m_layoutManager->refreshFromParser();
-        m_layoutManager->processLayout();
-    }
-
-    if (m_behaviorManager) {
-        auto processedWindows = m_layoutManager->processedWindows();
-        for (auto& wnd : processedWindows) {
-            if (!wnd) continue;
-            for (auto& ctrl : wnd->controls) {
-                if (ctrl)
-                    m_behaviorManager->applyBehavior(*ctrl);
-            }
-        }
+            m_layoutManager->processLayout();
     }
 
     // 4) DefineManager erwartet LISTE → flache Liste geben
@@ -96,11 +84,11 @@ void ProjectController::onTokensReady()
     // 5) TextManager erwartet LISTE → flache Liste geben
     if (m_textManager)
         m_textManager->rebuildFromTokens(flatTokens);
+
     emit projectLoaded();
 
     qInfo() << "[ProjectController] Token-basierter Rebuild abgeschlossen.";
 }
-
 // --------------------------------------------------
 // Projekt laden (mit automatischer Benutzerabfrage)
 // --------------------------------------------------
@@ -114,6 +102,9 @@ bool ProjectController::loadProject(const QString& configPath)
                                 ? ConfigManager::defaultConfigPath()
                                 : configPath;
 
+    // ---------------------------------------------------
+    // 0️⃣ Falls keine Config existiert -> User nach Infos fragen
+    // ---------------------------------------------------
     if (!QFileInfo::exists(cfgFile)) {
         qInfo() << "[ProjectController] Keine Config vorhanden – Benutzer wird gefragt.";
 
@@ -124,6 +115,7 @@ bool ProjectController::loadProject(const QString& configPath)
 
         QString iconDir  = QFileDialog::getExistingDirectory(nullptr, "Wähle den Icon-Ordner");
         if (iconDir.isEmpty()) return false;
+
         QString themeDir = QFileDialog::getExistingDirectory(nullptr, "Wähle den Theme-Ordner");
         if (themeDir.isEmpty()) return false;
 
@@ -136,6 +128,7 @@ bool ProjectController::loadProject(const QString& configPath)
             }
         }
 
+        // Speichern der neuen Config
         m_configManager->setLayoutPath(resdataFile);
         m_configManager->setIconPath(iconDir);
         m_configManager->setThemePath(themeDir);
@@ -143,6 +136,9 @@ bool ProjectController::loadProject(const QString& configPath)
         m_configManager->save(cfgFile);
     }
 
+    // ---------------------------------------------------
+    // 1️⃣ Config laden
+    // ---------------------------------------------------
     if (!m_configManager->load(cfgFile)) {
         qWarning() << "[ProjectController] Konnte Config nicht laden:" << cfgFile;
         return false;
@@ -150,42 +146,66 @@ bool ProjectController::loadProject(const QString& configPath)
 
     const QString resdataFile = m_configManager->layoutPath();
     m_fileManager->cacheLayoutPath(resdataFile);
-    const QString themeDir    = m_configManager->themePath();
-    const QString iconDir     = m_configManager->iconPath();
-    const QString sourceDir   = m_configManager->sourcePath();
+
+    const QString themeDir  = m_configManager->themePath();
+    const QString iconDir   = m_configManager->iconPath();
+    const QString sourceDir = m_configManager->sourcePath();
 
     // -----------------------------------------
     // 2️⃣ Flags prüfen + ggf. neu generieren
     // -----------------------------------------
-    const QString configDir = QFileInfo(cfgFile).absolutePath();
-    const QString wndFlagsPath  = configDir + "/window_flags.json";
-    const QString ctrlFlagsPath = configDir + "/control_flags.json";
+    const QString configDir      = QFileInfo(cfgFile).absolutePath();
+    const QString wndFlagsPath   = configDir + "/window_flags.json";
+    const QString ctrlFlagsPath  = configDir + "/control_flags.json";
 
-    const bool flagsMissing =
-        !QFileInfo::exists(wndFlagsPath) || !QFileInfo::exists(ctrlFlagsPath);
+    bool flagsMissing =
+        !QFileInfo::exists(wndFlagsPath) ||
+        !QFileInfo::exists(ctrlFlagsPath);
 
-    if (flagsMissing) {
+    if (flagsMissing)
+    {
         qInfo() << "[ProjectController] Flags fehlen → Erstelle neu.";
-        m_flagManager->generateFlags(sourceDir, wndFlagsPath, ctrlFlagsPath);
-    }
 
-    // -----------------------------------------
-    // 3️⃣ LayoutManager vorbereiten
-    // -----------------------------------------
+        // Scan Source → Flags werden im Speicher GEFÜLLT
+        m_flagManager->generateFlags(sourceDir, wndFlagsPath, ctrlFlagsPath);
+
+        // Jetzt darf alles erzeugt werden:
+        m_flagManager->generateRuleTemplates(configDir);
+        m_flagManager->generateFlagGroups(configDir);
+
+    }
+    else
+    {
+        qInfo() << "[ProjectController] Flags vorhanden → NICHT neu generieren.";
+
+        // Rule-Dateien prüfen & erweitern
+        m_flagManager->extendRuleFile(
+            configDir + "/window_flag_rules.json",
+            m_flagManager->windowFlags()
+            );
+        m_flagManager->extendRuleFile(
+            configDir + "/control_flag_rules.json",
+            m_flagManager->controlFlags()
+            );
+
+        // FlagGroups NUR erweitern, NICHT erzeugen!
+        m_flagManager->extendFlagGroups(configDir + "/flag_groups.json");
+    }
+    // ---------------------------------------------------
+    // 3️⃣ BehaviorManager: Flags neu einlesen
+    // ---------------------------------------------------
     if (m_behaviorManager)
         m_behaviorManager->refreshFlagsFromFiles();
 
-    // -----------------------------------------
-    // 4️⃣ Layout laden (startet Parser & Tokens)
-    // -----------------------------------------
+    // ---------------------------------------------------
+    // 4️⃣ Layout laden (Parser startet asynchron)
+    // ---------------------------------------------------
     m_layoutBackend->setPath(resdataFile);
     m_layoutBackend->load();
 
-    // Parser startet asynchron und triggert irgendwann onTokenReady()
-
-    // -----------------------------------------
-    // 5️⃣ LayoutManager verknüpfen & verarbeiten
-    // -----------------------------------------
+    // ---------------------------------------------------
+    // 5️⃣ Layout verarbeiten
+    // ---------------------------------------------------
     m_layoutManager->refreshFromParser();
     m_layoutManager->processLayout();
     qInfo() << "[ProjectController] Layout-Daten vollständig initialisiert – sende layoutsReady()";
@@ -194,12 +214,12 @@ bool ProjectController::loadProject(const QString& configPath)
     auto processedWindows = m_layoutManager->processedWindows();
     qInfo() << "[ProjectController] Processed Layouts:" << processedWindows.size();
 
-    // -----------------------------------------
+    // ---------------------------------------------------
     // 6️⃣ Defines & Texte laden
-    // -----------------------------------------
-    const QString defineFile   = m_fileManager->findDefineFile(resdataFile);
-    const QString textFile     = m_fileManager->findTextFile(resdataFile);
-    const QString textIncFile  = m_fileManager->findTextIncFile(resdataFile);
+    // ---------------------------------------------------
+    const QString defineFile  = m_fileManager->findDefineFile(resdataFile);
+    const QString textFile    = m_fileManager->findTextFile(resdataFile);
+    const QString textIncFile = m_fileManager->findTextIncFile(resdataFile);
 
     if (!defineFile.isEmpty())
         m_defineBackend->load(defineFile, *m_defineManager);
@@ -210,20 +230,15 @@ bool ProjectController::loadProject(const QString& configPath)
     if (!textIncFile.isEmpty())
         m_textBackend->loadInc(textIncFile, *m_textManager);
 
-    // -----------------------------------------
-    // 7️⃣ Ressourcen (Icons / Themes)
-    // -----------------------------------------
+    // ---------------------------------------------------
+    // 7️⃣ Ressourcen laden
+    // ---------------------------------------------------
     m_icons = ResourceUtils::loadIcons(iconDir);
 
-    // Theme laden über ThemeManager
     if (m_themeManager)
     {
-        // Standardmäßig das Default-Theme laden
         QString defaultTheme = "Default";
-
-        // Optional: wenn "English" oder anderes existiert
-        QString englishPath = m_fileManager->themeFolderPath("English");
-        if (QDir(englishPath).exists())
+        if (QDir(m_fileManager->themeFolderPath("English")).exists())
             defaultTheme = "English";
 
         qInfo().noquote() << "[ProjectController] Lade Theme über ThemeManager:" << defaultTheme;
@@ -234,15 +249,14 @@ bool ProjectController::loadProject(const QString& configPath)
         qWarning() << "[ProjectController] Kein ThemeManager verfügbar!";
     }
 
-    // -----------------------------------------
-    // 🔒 Abschluss-Check: Tokens schon da?
-    // -----------------------------------------
+    // ---------------------------------------------------
+    // 🔒 Abschluss-Check: Tokens synchronisieren
+    // ---------------------------------------------------
     if (m_tokensReady) {
         qInfo() << "[ProjectController] Tokens bereits verfügbar → Projekt wird jetzt als geladen markiert.";
 
         emit projectLoaded();
 
-        // Fensterdaten asynchron verteilen
         QTimer::singleShot(0, this, [this, processedWindows]() {
             if (!processedWindows.empty() && processedWindows.front()) {
                 emit windowsReady(processedWindows);

@@ -6,8 +6,9 @@
 #include <vector>
 
 #include "LayoutParser.h"
-#include "model/WindowData.h"
-#include "model/ControlData.h"
+#include "WindowData.h"
+#include "ControlData.h"
+#include "BehaviorManager.h"
 
 class LayoutBackend;
 class BehaviorManager;
@@ -23,7 +24,7 @@ public:
     explicit LayoutManager(LayoutParser& parser, LayoutBackend& backend);
 
     // Behavior anbinden
-    void setBehaviorManager(BehaviorManager* behavior) { m_behavior = behavior; }
+    void setBehaviorManager(BehaviorManager* behavior) { m_behaviorManager = behavior; }
 
     // ------------------------------
     // 🔹 Datenaktualisierung
@@ -60,7 +61,7 @@ signals:
 private:
     LayoutParser&   m_parser;
     LayoutBackend&  m_backend;
-    BehaviorManager* m_behavior = nullptr;
+    BehaviorManager* m_behaviorManager;
 
     std::vector<std::shared_ptr<WindowData>> m_windows;
 

@@ -28,10 +28,19 @@ public:
     bool useLegacyMode(bool enabled);
     const QMap<QString, QString>& legacyWindowFlags() const { return m_legacyWindowFlags; }
     const QMap<QString, QString>& legacyControlFlags() const { return m_legacyControlFlags; }
+    const QMap<QString, QString>& windowFlags() const { return m_windowFlags; }
+    const QMap<QString, QString>& controlFlags() const { return m_controlFlags; }
 
     void generateFlags(const QString& sourceDir,
                         const QString& wndPath,
                         const QString& ctrlPath);
+    void generateRuleTemplates(const QString& configDir);
+    void extendRuleFile(const QString& filePath,
+                                     const QMap<QString, QString>& knownFlags);
+    void initDefaultSemantics();
+    void autoFillSemantics(const QString& ruleFilePath);
+    void extendFlagGroups(const QString& groupsPath);
+    void generateFlagGroups(const QString& configDir);
 
 private:
     // ------------------------------------------------------------
@@ -65,6 +74,7 @@ private:
     QMap<QString, QString> m_legacyWindowFlags;
     QMap<QString, QString> m_legacyControlFlags;
     QStringList m_legacyOverrides;
+    QMap<QString, QJsonObject> m_defaultSemantics;
 
     bool m_useLegacy = false;
 };

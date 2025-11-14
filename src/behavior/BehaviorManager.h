@@ -8,17 +8,11 @@
 #include <memory>
 #include <vector>
 
-// ---------------------------------------------------------
-// Beschreibende Struktur für fertiges Verhalten
-// ---------------------------------------------------------
 struct BehaviorInfo {
-    QString category;                      // z.B. "button", "label", "listbox"
-    QMap<QString, QVariant> attributes;    // beliebige Meta-Infos
+    QString category;
+    QMap<QString, QVariant> attributes;
 };
 
-// ---------------------------------------------------------
-// Grundfähigkeiten eines Controls (hartcodiert)
-// ---------------------------------------------------------
 enum ControlCapability : quint32
 {
     ControlCapability_None           = 0,
@@ -35,17 +29,13 @@ enum ControlCapability : quint32
 Q_DECLARE_FLAGS(ControlCapabilities, ControlCapability)
 Q_DECLARE_OPERATORS_FOR_FLAGS(ControlCapabilities)
 
-// ---------------------------------------------------------
-// Basisverhalten pro Typ (hartcodiert)
-// ---------------------------------------------------------
 struct BaseBehavior
 {
-    QString             category;       // z.B. "button", "label"
-    ControlCapabilities capabilities;   // Grundfähigkeiten (CanClick, ...)
-    QMap<QString, QVariant> defaults;   // z.B. defaultColor, textAlign, ...
+    QString category;
+    ControlCapabilities capabilities;
+    QMap<QString, QVariant> defaults;
 };
 
-// Forward-Declarations
 class FlagManager;
 class TextManager;
 class DefineManager;
@@ -54,84 +44,80 @@ class LayoutBackend;
 struct ControlData;
 struct WindowData;
 
-// =========================================================
-// BehaviorManager
-//  - verwaltet Flags & Flag-Regeln
-//  - hält Basis-Behavior pro Control-Typ
-//  - liefert auf Anfrage BehaviorInfo für Renderer/Input
-// =========================================================
 class BehaviorManager
 {
 public:
-    BehaviorManager(FlagManager*   flagMgr,
-                    TextManager*   textMgr,
+    BehaviorManager(FlagManager* flagMgr,
+                    TextManager* textMgr,
                     DefineManager* defineMgr,
                     LayoutManager* layoutMgr,
                     LayoutBackend* layoutBackend);
 
-    // -----------------------------------------
-    // 🔹 Flags aus JSON laden (Fenster / Controls)
-    // -----------------------------------------
-    void refreshFlagsFromFiles(const QString& wndFlagsPath = QString(),
-                               const QString& ctrlFlagsPath = QString());
+    // --- Flags laden ---
+    void refreshFlagsFromFiles(const QString& wndFlagsPath = {},
+                               const QString& ctrlFlagsPath = {});
 
-    const QMap<QString, quint32>& windowFlags()  const { return m_windowFlags;  }
+    const QMap<QString, quint32>& windowFlags()  const { return m_windowFlags; }
     const QMap<QString, quint32>& controlFlags() const { return m_controlFlags; }
 
-    // -----------------------------------------
-    // 🔹 Flag-Regeln (window_flag_rules.json / control_flag_rules.json)
-    // -----------------------------------------
     QJsonObject windowFlagRules() const;
     QJsonObject controlFlagRules() const;
 
-    // -----------------------------------------
-    // 🔹 Masken → resolvedMask aktualisieren
-    // -----------------------------------------
+    // --- Flags interpretieren ---
     void updateWindowFlags(const std::shared_ptr<WindowData>& wnd) const;
     void updateControlFlags(const std::shared_ptr<ControlData>& ctrl) const;
     void applyWindowStyle(WindowData& wnd) const;
 
-    // -----------------------------------------
-    // 🔹 Validierung & Analyse (LayoutManager ruft das)
-    // -----------------------------------------
+    // --- Validierung ---
     void validateWindowFlags(WindowData* wnd) const;
     void validateControlFlags(ControlData* ctrl) const;
+
+    // --- Analyse (optional) ---
     void analyzeControlTypes(const std::vector<std::shared_ptr<WindowData>>& windows) const;
     void generateUnknownControls(const std::vector<std::shared_ptr<WindowData>>& windows) const;
 
-    // -----------------------------------------
-    // 🔹 Behavior-API
-    //     - kombiniert BaseBehavior (hartcodiert)
-    //       + optionale Config aus Datei
-    // -----------------------------------------
+    // ===========================================
+    // Behavior API – finale öffentliche Funktionen
+    // ===========================================
     BehaviorInfo resolveBehavior(const ControlData& ctrl) const;
-    void applyBehavior(ControlData& ctrl) const;   // optional: Defaults anwenden
+    BehaviorInfo resolveBehavior(const WindowData& wnd) const;
 
 private:
+    // --- Manager ---
     FlagManager*    m_flagMgr   = nullptr;
     TextManager*    m_textMgr   = nullptr;
     DefineManager*  m_defineMgr = nullptr;
     LayoutManager*  m_layoutMgr = nullptr;
     LayoutBackend*  m_layoutBackend = nullptr;
 
-    // Flags (aus window_flags.json / control_flags.json)
+    // --- interne Helfer ---
+    QMap<QString, QVariant> resolveControlSemantic(const ControlData& ctrl) const;
+    QMap<QString, QVariant> resolveWindowSemantic(const WindowData& wnd) const;
+
+    QMap<QString, QVariant> deriveCombinedBehavior(
+        const QString& normalizedType,
+        const QMap<QString, QVariant>& semantic) const;
+
+    QString normalizeType(const QString& type) const;
+
+    // --- Flags ---
     QMap<QString, quint32> m_windowFlags;
     QMap<QString, quint32> m_controlFlags;
 
-    // Regeln (aus window_flag_rules.json / control_flag_rules.json)
+    // --- Rules ---
     mutable QJsonObject m_windowRules;
     mutable QJsonObject m_controlRules;
     mutable bool m_windowRulesLoaded  = false;
     mutable bool m_controlRulesLoaded = false;
 
-    // Basis-Behavior (hartcodiert) pro Control-Type (z.B. "WTYPE_BUTTON")
+    // --- BaseBehaviors ---
     QMap<QString, BaseBehavior> m_baseBehaviors;
 
-    // Erweiterbare Behavior-Konfiguration aus Datei (optional)
+    // --- Optionale BehaviorConfig (noch leer) ---
     mutable QJsonObject m_behaviorConfig;
     mutable bool m_behaviorConfigLoaded = false;
 
-    // Initialisierungen / Lazy-Loader
+    // --- Initialisierung ---
     void initializeBaseBehaviors();
     void reloadWindowFlagRules() const;
     void reloadControlFlagRules() const;
