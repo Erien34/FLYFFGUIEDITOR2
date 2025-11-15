@@ -150,83 +150,83 @@ inline QPixmap loadSinglePixmap(const QString& filePath)
 // ------------------------------------------------------------
 // 🔹 Lädt alle Pixmaps (Themes / Fensterrahmen / UI)
 // ------------------------------------------------------------
-inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath,
-                                          const QString& themeName = QString())
-{
-    QMap<QString, QPixmap> result;
+// inline QMap<QString, QPixmap> loadPixmaps(const QString& dirPath,
+//                                           const QString& themeName = QString())
+// {
+//     QMap<QString, QPixmap> result;
 
-    if (dirPath.isEmpty() || !QDir(dirPath).exists()) {
-        qWarning() << "[ResourceUtils] Theme-Pfad ungültig:" << dirPath;
-        return result;
-    }
+//     if (dirPath.isEmpty() || !QDir(dirPath).exists()) {
+//         qWarning() << "[ResourceUtils] Theme-Pfad ungültig:" << dirPath;
+//         return result;
+//     }
 
-    const QStringList filters = {"*.tga", "*.png", "*.jpg", "*.bmp"};
-    QDirIterator it(dirPath, filters, QDir::Files, QDirIterator::Subdirectories);
+//     const QStringList filters = {"*.tga", "*.png", "*.jpg", "*.bmp"};
+//     QDirIterator it(dirPath, filters, QDir::Files, QDirIterator::Subdirectories);
 
-    QString logName = themeName.isEmpty() ? "theme_debug_log.txt"
-                                          : QString("theme_debug_%1_log.txt").arg(themeName);
-    QFile logFile(QDir(dirPath).filePath(logName));
-    logFile.open(QIODevice::WriteOnly | QIODevice::Text);
-    QTextStream log(&logFile);
+//     QString logName = themeName.isEmpty() ? "theme_debug_log.txt"
+//                                           : QString("theme_debug_%1_log.txt").arg(themeName);
+//     QFile logFile(QDir(dirPath).filePath(logName));
+//     logFile.open(QIODevice::WriteOnly | QIODevice::Text);
+//     QTextStream log(&logFile);
 
-    int loaded = 0, failed = 0;
+//     int loaded = 0, failed = 0;
 
-    while (it.hasNext()) {
-        const QString filePath = it.next();
-        QFileInfo fi(filePath);
-        const QString key = fi.baseName().toLower();
+//     while (it.hasNext()) {
+//         const QString filePath = it.next();
+//         QFileInfo fi(filePath);
+//         const QString key = fi.baseName().toLower();
 
-        QPixmap pix = loadSinglePixmap(filePath);
-        pix = clampTransparentEdges(pix);
-        pix = applyMagentaMask(pix);
+//         QPixmap pix = loadSinglePixmap(filePath);
+//         pix = clampTransparentEdges(pix);
+//         pix = applyMagentaMask(pix);
 
-        if (pix.isNull()) {
-            log << "❌ Fehler: " << filePath << "\n";
-            failed++;
-            continue;
-        }
+//         if (pix.isNull()) {
+//             log << "❌ Fehler: " << filePath << "\n";
+//             failed++;
+//             continue;
+//         }
 
-        result.insert(key, pix);
-        log << "✅ Geladen: " << key << " (" << pix.width() << "x" << pix.height() << ")\n";
-        loaded++;
-    }
+//         result.insert(key, pix);
+//         log << "✅ Geladen: " << key << " (" << pix.width() << "x" << pix.height() << ")\n";
+//         loaded++;
+//     }
 
-    log << "\nGesamt geladen: " << loaded
-        << " | Fehler: " << failed
-        << " | Gesamtdateien: " << (loaded + failed) << "\n";
-    logFile.close();
+//     log << "\nGesamt geladen: " << loaded
+//         << " | Fehler: " << failed
+//         << " | Gesamtdateien: " << (loaded + failed) << "\n";
+//     logFile.close();
 
-    qInfo().noquote() << QString("[ResourceUtils] Theme '%1': %2 Texturen (%3 Fehler)")
-                             .arg(themeName.isEmpty() ? "(unknown)" : themeName)
-                             .arg(loaded)
-                             .arg(failed);
+//     qInfo().noquote() << QString("[ResourceUtils] Theme '%1': %2 Texturen (%3 Fehler)")
+//                              .arg(themeName.isEmpty() ? "(unknown)" : themeName)
+//                              .arg(loaded)
+//                              .arg(failed);
 
-    return result;
-}
+//     return result;
+// }
 
-inline QMap<QString, QPixmap> loadMergedThemes(const QString& defaultPath,
-                                               const QString& customPath = QString(),
-                                               const QString& themeName = QString())
-{
-    // 1️⃣ Default laden
-    QMap<QString, QPixmap> merged = loadPixmaps(defaultPath, "Default");
+// inline QMap<QString, QPixmap> loadMergedThemes(const QString& defaultPath,
+//                                                const QString& customPath = QString(),
+//                                                const QString& themeName = QString())
+// {
+//     // 1️⃣ Default laden
+//     QMap<QString, QPixmap> merged = loadPixmaps(defaultPath, "Default");
 
-    // 2️⃣ Wenn Custom-Theme vorhanden → überschreibe Default-Einträge
-    if (!customPath.isEmpty() && QDir(customPath).exists()) {
-        QMap<QString, QPixmap> custom = loadPixmaps(customPath, themeName);
+//     // 2️⃣ Wenn Custom-Theme vorhanden → überschreibe Default-Einträge
+//     if (!customPath.isEmpty() && QDir(customPath).exists()) {
+//         QMap<QString, QPixmap> custom = loadPixmaps(customPath, themeName);
 
-        for (auto it = custom.begin(); it != custom.end(); ++it)
-            merged[it.key()] = it.value();
+//         for (auto it = custom.begin(); it != custom.end(); ++it)
+//             merged[it.key()] = it.value();
 
-        qInfo().noquote() << QString("[ResourceUtils] Themes kombiniert: Default + %1 (%2 Texturen)")
-                                 .arg(themeName.isEmpty() ? "Custom" : themeName)
-                                 .arg(merged.size());
-    } else {
-        qInfo() << "[ResourceUtils] Kein zusätzliches Theme gefunden, verwende nur Default.";
-    }
+//         qInfo().noquote() << QString("[ResourceUtils] Themes kombiniert: Default + %1 (%2 Texturen)")
+//                                  .arg(themeName.isEmpty() ? "Custom" : themeName)
+//                                  .arg(merged.size());
+//     } else {
+//         qInfo() << "[ResourceUtils] Kein zusätzliches Theme gefunden, verwende nur Default.";
+//     }
 
-    return merged;
-}
+//     return merged;
+// }
 
 // ------------------------------------------------------------
 // 🔹 Lädt Icons (kleinere Grafiken, Buttons etc.)
@@ -288,63 +288,63 @@ inline QMap<QString, QIcon> loadIcons(const QString& dirPath)
 }
 
 // DetectTilePrefix – erkennt dynamisch Fenster- und Control-Tiles
-inline QString detectTilePrefix(const QMap<QString, QPixmap>& themes,
-                                const QStringList& candidates = {},
-                                const QString& preferred = QString())
-{
-    // 1️⃣ Explizit bevorzugtes Präfix prüfen
-    if (!preferred.isEmpty()) {
-        QString key = preferred.toLower();
-        if (themes.contains(key + "00") || themes.contains(key + "01"))
-            return key;
-    }
+// inline QString detectTilePrefix(const QMap<QString, QPixmap>& themes,
+//                                 const QStringList& candidates = {},
+//                                 const QString& preferred = QString())
+// {
+//     // 1️⃣ Explizit bevorzugtes Präfix prüfen
+//     if (!preferred.isEmpty()) {
+//         QString key = preferred.toLower();
+//         if (themes.contains(key + "00") || themes.contains(key + "01"))
+//             return key;
+//     }
 
-    // 2️⃣ Wenn Kandidatenliste übergeben wurde → NUR diese prüfen
-    QStringList prefixesToCheck;
-    if (!candidates.isEmpty()) {
-        prefixesToCheck = candidates;
-    } else {
-        prefixesToCheck = {
-            "wndtile", "wndedittile", "wndbutton", "buttnormal",
-            "wndcheckbox", "wndscrollbar", "wndtabtile",
-            "wndbar", "wndlistbox", "wndlistctrl", "wndedit", "edit", "button"
-        };
-    }
+//     // 2️⃣ Wenn Kandidatenliste übergeben wurde → NUR diese prüfen
+//     QStringList prefixesToCheck;
+//     if (!candidates.isEmpty()) {
+//         prefixesToCheck = candidates;
+//     } else {
+//         prefixesToCheck = {
+//             "wndtile", "wndedittile", "wndbutton", "buttnormal",
+//             "wndcheckbox", "wndscrollbar", "wndtabtile",
+//             "wndbar", "wndlistbox", "wndlistctrl", "wndedit", "edit", "button"
+//         };
+//     }
 
-    QString bestMatch;
-    int bestScore = -1;
+//     QString bestMatch;
+//     int bestScore = -1;
 
-    for (const QString& prefix : prefixesToCheck) {
-        int count = 0;
-        for (int i = 0; i < 9; ++i) {
-            QString key = QString("%1%2").arg(prefix).arg(i, 2, 10, QChar('0'));
-            if (themes.contains(key))
-                count++;
-        }
-        if (count > bestScore) {
-            bestScore = count;
-            bestMatch = prefix;
-        }
-    }
+//     for (const QString& prefix : prefixesToCheck) {
+//         int count = 0;
+//         for (int i = 0; i < 9; ++i) {
+//             QString key = QString("%1%2").arg(prefix).arg(i, 2, 10, QChar('0'));
+//             if (themes.contains(key))
+//                 count++;
+//         }
+//         if (count > bestScore) {
+//             bestScore = count;
+//             bestMatch = prefix;
+//         }
+//     }
 
-    if (!bestMatch.isEmpty()) {
-        qInfo().noquote() << "[ResourceUtils] detectTilePrefix ✓ erkannt:" << bestMatch;
-        return bestMatch;
-    }
+//     if (!bestMatch.isEmpty()) {
+//         qInfo().noquote() << "[ResourceUtils] detectTilePrefix ✓ erkannt:" << bestMatch;
+//         return bestMatch;
+//     }
 
-    // 3️⃣ Dynamischer Fallback: suche ein beliebiges Schlüssel-Muster mit 00–08 am Ende
-    for (auto it = themes.constBegin(); it != themes.constEnd(); ++it) {
-        QString key = it.key().toLower();
-        if (key.endsWith("00") || key.endsWith("01")) {
-            QString base = key.left(key.size() - 2);
-            qInfo().noquote() << "[ResourceUtils] detectTilePrefix (Fallback):" << base;
-            return base;
-        }
-    }
+//     // 3️⃣ Dynamischer Fallback: suche ein beliebiges Schlüssel-Muster mit 00–08 am Ende
+//     for (auto it = themes.constBegin(); it != themes.constEnd(); ++it) {
+//         QString key = it.key().toLower();
+//         if (key.endsWith("00") || key.endsWith("01")) {
+//             QString base = key.left(key.size() - 2);
+//             qInfo().noquote() << "[ResourceUtils] detectTilePrefix (Fallback):" << base;
+//             return base;
+//         }
+//     }
 
-    qWarning() << "[ResourceUtils] detectTilePrefix ⚠ Kein Prefix gefunden.";
-    return QString();
-}
+//     qWarning() << "[ResourceUtils] detectTilePrefix ⚠ Kein Prefix gefunden.";
+//     return QString();
+// }
 
 // ------------------------------------------------------------
 // 🔹 Findet eine Textur im Theme-Map – tolerant gegenüber Pfaden / Endungen / Case

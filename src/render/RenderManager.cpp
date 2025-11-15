@@ -22,21 +22,30 @@ void RenderManager::refresh()
     emit requestRepaint();
 }
 
-void RenderManager::render(QPainter* painter, const std::shared_ptr<WindowData>& wnd)
+void RenderManager::render(QPainter* painter,
+                           const std::shared_ptr<WindowData>& wnd)
 {
-    if (!painter || !wnd)
+    if (!painter || !wnd || !m_windowRenderer)
         return;
 
+    // 1) Hintergrund zeichnen (Canvas)
     painter->save();
 
-    // Hintergrund (Canvas)
-    painter->fillRect(QRect(0, 0, 800, 600), QColor(45, 45, 45));
+    const int canvasW = painter->device()->width();
+    const int canvasH = painter->device()->height();
+    QRect canvasRect(0, 0, canvasW, canvasH);
+
+    painter->fillRect(canvasRect, QColor(45, 45, 45));
     painter->setPen(Qt::gray);
-    painter->drawRect(0, 0, 799, 599);
+    painter->drawRect(canvasRect.adjusted(0, 0, -1, -1));
     painter->drawText(10, 20, "[RenderManager] aktiv");
 
     painter->restore();
 
-    // Fenster vollständig durch RenderWindow rendern
-    m_windowRenderer->render(painter, *wnd);
+    // 2) Canvasgröße an RenderWindow übergeben
+    QSize canvasSize(canvasW, canvasH);
+
+    // 3) Fenster vollständig durch RenderWindow rendern
+    //    (korrekte Signatur mit Referenz!)
+    m_windowRenderer->render(*painter, wnd, canvasSize);
 }

@@ -1,26 +1,46 @@
 #pragma once
 #include <QObject>
 #include <QPainter>
-#include <QPixmap>
-#include "layout/model/WindowData.h"
-#include "theme/ThemeManager.h"
-#include "behavior/BehaviorManager.h"
+#include <memory>
+
+#include "ThemeManager.h"
+#include "BehaviorManager.h"
+#include "WindowData.h"
 
 class RenderWindow : public QObject
 {
     Q_OBJECT
+
 public:
     explicit RenderWindow(ThemeManager* themeManager,
                           BehaviorManager* behaviorManager,
                           QObject* parent = nullptr);
 
-    void render(QPainter* painter, const WindowData& window);
+    // Neues, einzig gültiges Render
+    void render(QPainter& p,
+                const std::shared_ptr<WindowData>& wnd,
+                const QSize& canvasSize);
 
 private:
-    ThemeManager* m_themeManager;
-    BehaviorManager* m_behaviorManager;
+    // Render-Teile
+    bool drawDirectWindowTexture(QPainter& p,
+                                 const std::shared_ptr<WindowData>& wnd,
+                                 const QRect& wndRect);
 
-    void drawFrame(QPainter* painter, const QRect& rect);
+    bool drawWindowTileset(QPainter& p, const QRect& area);
+
+    void drawFallbackWindow(QPainter& p, const QRect& wndRect);
+
+    void drawTitleAndButtons(QPainter& p,
+                             const std::shared_ptr<WindowData>& wnd,
+                             const QRect& wndRect);
+
+    // Single buttons
     void drawCloseButton(QPainter* painter, const QRect& rect);
     void drawHelpButton(QPainter* painter, const QRect& rect);
+    void drawFallbackButton(QPainter& p, const QRect& rect, const QColor& color, const QString& text);
+
+private:
+    ThemeManager* m_themeManager = nullptr;
+    BehaviorManager* m_behaviorManager = nullptr;
 };

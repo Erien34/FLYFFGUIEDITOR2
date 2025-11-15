@@ -5,7 +5,6 @@
 #include "ControlState.h"
 #include "FileManager.h"
 #include "TokenData.h"
-#include "ResourceUtils.h"
 
 class ThemeManager : public QObject
 {
@@ -24,7 +23,8 @@ struct WindowSkin {
     bool setCurrentTheme(const QString& themeName);   // wechselt aktiv verwendetes Theme
     QString currentTheme() const { return m_currentTheme; }
 
-    const QPixmap& texture(const QString& key, ControlState state = ControlState::Normal) const;
+    QPixmap texture(const QString& key, ControlState state) const;
+
     WindowSkin resolveWindowSkin(const QString& texName, int wndW, int wndH) const;
 
 signals:
@@ -40,6 +40,9 @@ private:
     bool matchesFullTexture(const QPixmap& pm, int wndW, int wndH) const;
 
     QPixmap textureFor(const QString& name, ControlState state = ControlState::Normal) const;
+
+    QMap<QString, QPixmap> loadPixmaps(const QString& path,
+                                       const QString& themeName);
 
     FileManager* m_fileMgr = nullptr;
     QString m_currentTheme;

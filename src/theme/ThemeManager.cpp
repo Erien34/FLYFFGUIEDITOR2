@@ -1,4 +1,5 @@
 #include "ThemeManager.h"
+#include "ResourceUtils.h"
 #include <QDir>
 #include <QDebug>
 #include <QFileInfo>
@@ -20,6 +21,78 @@ void ThemeManager::clear()
     m_currentTheme.clear();
 }
 
+QMap<QString, QPixmap> ThemeManager::loadPixmaps(const QString& dirPath,
+                                                 const QString& themeName)
+{
+    QMap<QString, QPixmap> result;
+
+    if (dirPath.isEmpty() || !QDir(dirPath).exists()) {
+        qWarning() << "[ThemeManager] Ungültiger Theme-Pfad:" << dirPath;
+        return result;
+    }
+
+    const QStringList filters = { "*.tga", "*.png", "*.jpg", "*.bmp" };
+    QDirIterator it(dirPath, filters, QDir::Files, QDirIterator::Subdirectories);
+
+    QString logName = themeName.isEmpty()
+                          ? "theme_debug_log.txt"
+                          : QString("theme_debug_%1_log.txt").arg(themeName);
+
+    QFile logFile(QDir(dirPath).filePath(logName));
+    logFile.open(QIODevice::WriteOnly | QIODevice::Text);
+    QTextStream log(&logFile);
+
+    int loaded = 0;
+    int failed = 0;
+
+    while (it.hasNext()) {
+        QString filePath = it.next();
+        QFileInfo fi(filePath);
+
+        // 🔹 Der Key ist der Basisname in lowercase
+        QString key = fi.baseName().toLower();
+
+        QPixmap pix;
+
+        // TGA mit Flyff-spezialbehandlung
+        if (fi.suffix().compare("tga", Qt::CaseInsensitive) == 0) {
+            QImage tga = ResourceUtils::loadFlyffTga(filePath);
+            if (!tga.isNull())
+                pix = QPixmap::fromImage(tga);
+        }
+        else {
+            QImageReader reader(filePath);
+            reader.setAutoTransform(true);
+            pix = QPixmap::fromImageReader(&reader);
+        }
+
+        if (pix.isNull()) {
+            log << "❌ Fehler: " << filePath << "\n";
+            failed++;
+            continue;
+        }
+
+        // 🔹 Flyff-typische Korrekturen
+        pix = ResourceUtils::clampTransparentEdges(pix);
+        pix = ResourceUtils::applyMagentaMask(pix);
+
+        log << "✓ Geladen: " << key << " (" << pix.width() << "x" << pix.height() << ")\n";
+        result.insert(key, pix);
+        loaded++;
+    }
+
+    log << "\nGesamt geladen: " << loaded
+        << " | Fehler: " << failed
+        << " | Dateien: " << (loaded + failed) << "\n";
+
+    logFile.close();
+
+    qInfo().noquote() << QString("[ThemeManager] Log-Datei: %1")
+                             .arg(logFile.fileName());
+
+    return result;
+}
+
 bool ThemeManager::loadTheme(const QString& themeName)
 {
     if (!m_fileMgr) {
@@ -38,12 +111,13 @@ bool ThemeManager::loadTheme(const QString& themeName)
     qInfo().noquote() << "[ThemeManager] Lade Theme:" << themeName;
 
     // 1️⃣ Default-Theme laden
-    QMap<QString, QPixmap> defaultPixmaps = ResourceUtils::loadPixmaps(defaultPath);
+    QMap<QString, QPixmap> defaultPixmaps =
+        loadPixmaps(defaultPath, "Default");
 
     // 2️⃣ Optionales Theme (z. B. English) laden
     QMap<QString, QPixmap> themePixmaps;
     if (!themePath.isEmpty() && QDir(themePath).exists())
-        themePixmaps = ResourceUtils::loadPixmaps(themePath);
+        themePixmaps = loadPixmaps(themePath, themeName);
 
     // 3️⃣ Theme-Mapping vorbereiten
     QMap<QString, QMap<ControlState, QPixmap>> themeMap;
@@ -58,13 +132,13 @@ bool ThemeManager::loadTheme(const QString& themeName)
 
             QMap<ControlState, QPixmap> states;
 
-            // 🔍 Wenn das Bild viermal breiter als hoch ist → SpriteStrip mit 4 States
+            // 🔍 4-State SpriteStrip?
             if (pix.width() >= pix.height() * 4)
                 states = splitTextureStates(pix);
             else
                 states[ControlState::Normal] = pix;
 
-            themeMap.insert(key, states);
+            themeMap[key] = states;
         }
     };
 
@@ -75,17 +149,21 @@ bool ThemeManager::loadTheme(const QString& themeName)
     // 5️⃣ In globale Map eintragen
     m_themes.insert(themeName.toLower(), themeMap);
 
-    // 6️⃣ Falls noch kein aktives Theme → dieses setzen
+    qDebug() << "[ThemeManager] Stored theme:" << themeName.toLower()
+             << "with" << themeMap.size() << "entries";
+
+
+    // 6️⃣ Falls noch kein aktives Theme → setzen
     if (m_currentTheme.isEmpty())
         m_currentTheme = themeName.toLower();
 
-    qInfo().noquote() << QString("[ThemeManager] Theme '%1' geladen (%2 Texturen)")
-                             .arg(themeName)
-                             .arg(themeMap.size());
+    qInfo().noquote() << "[ThemeManager] Theme '" << themeName
+                      << "' geladen (" << themeMap.size() << " Texturen)";
 
     emit texturesUpdated();
     return true;
 }
+
 
 bool ThemeManager::setCurrentTheme(const QString& themeName)
 {
@@ -122,42 +200,56 @@ QMap<ControlState, QPixmap> ThemeManager::splitTextureStates(const QPixmap& src)
     return map;
 }
 
-const QPixmap& ThemeManager::texture(const QString& key, ControlState state) const
+QPixmap ThemeManager::texture(const QString& name, ControlState state) const
 {
-    static QPixmap dummy;
-
-    // Kein aktives Theme → Dummy
     if (m_currentTheme.isEmpty() || !m_themes.contains(m_currentTheme)) {
-        qWarning() << "[ThemeManager] Kein aktives Theme gesetzt oder gefunden!";
-        return dummy;
+        qWarning() << "[ThemeManager] Kein aktives Theme!";
+        return QPixmap();
     }
 
-    const QString lowerKey = key.toLower();
-    const auto& currentThemeMap = m_themes.value(m_currentTheme);
+    QFileInfo fi(name);
+    QString key = fi.completeBaseName().toLower();
 
-    // 1️⃣ Suche im aktiven Theme
-    if (currentThemeMap.contains(lowerKey)) {
-        const auto& states = currentThemeMap.value(lowerKey);
+    const auto& themeMap = m_themes.value(m_currentTheme);
+
+    auto fetchPixmap = [&](const QMap<QString, QMap<ControlState, QPixmap>>& map,
+                           const QString& debugName)
+    {
+        if (!map.contains(key))
+            return QPixmap();
+
+        const auto& states = map.value(key);
+
         if (states.contains(state))
             return states.value(state);
+
         if (states.contains(ControlState::Normal))
             return states.value(ControlState::Normal);
-    }
 
-    // 2️⃣ Fallback: Default-Theme
+        return QPixmap();
+    };
+
+    // 1) Aktives Theme
+    QPixmap pm = fetchPixmap(themeMap, "Active");
+    if (!pm.isNull())
+        return pm;
+
+    // 2) Fallback: Default Theme
     if (m_themes.contains("default")) {
-        const auto& defaultThemeMap = m_themes.value("default");
-        if (defaultThemeMap.contains(lowerKey)) {
-            const auto& states = defaultThemeMap.value(lowerKey);
-            if (states.contains(state))
-                return states.value(state);
-            if (states.contains(ControlState::Normal))
-                return states.value(ControlState::Normal);
-        }
+        const auto& defMap = m_themes.value("default");
+        pm = fetchPixmap(defMap, "Default");
+
+        if (!pm.isNull())
+            return pm;
     }
 
-    qWarning() << "[ThemeManager] Textur nicht gefunden:" << key;
-    return dummy;
+    static QSet<QString> warned;
+    if (!warned.contains(key)) {
+        warned.insert(key);
+        qWarning() << "[ThemeManager] Textur nicht gefunden:" << name;
+    }
+
+    return QPixmap();
 }
 
 bool ThemeManager::matchesFullTexture(const QPixmap& pm, int wndW, int wndH) const
