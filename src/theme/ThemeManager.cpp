@@ -159,3 +159,95 @@ const QPixmap& ThemeManager::texture(const QString& key, ControlState state) con
     qWarning() << "[ThemeManager] Textur nicht gefunden:" << key;
     return dummy;
 }
+
+bool ThemeManager::matchesFullTexture(const QPixmap& pm, int wndW, int wndH) const
+{
+    if (pm.isNull())
+        return false;
+
+    return pm.width() == wndW && pm.height() == wndH;
+}
+
+bool ThemeManager::hasTileSet(const QString& baseName) const
+{
+    for (int i = 0; i < 12; i++)
+    {
+        QString key = QString("%1%2").arg(baseName).arg(i, 2, 10, QChar('0'));
+
+        if (textureFor(key).isNull())
+            return false;
+    }
+    return true;
+}
+
+ThemeManager::WindowSkin ThemeManager::buildTileSet(const QString& baseName) const
+{
+    WindowSkin skin;
+
+    for (int i = 0; i < 12; i++)
+    {
+        QString key = QString("%1%2").arg(baseName).arg(i, 2, 10, QChar('0'));
+
+        skin.tiles[i] = textureFor(key);
+
+        if (skin.tiles[i].isNull())
+            return skin;
+    }
+
+    skin.isTileset = true;
+    skin.valid = true;
+    return skin;
+}
+
+QPixmap ThemeManager::textureFor(const QString& name, ControlState state) const
+{
+    if (!m_themes.contains(m_currentTheme))
+        return QPixmap();
+
+    const auto& theme = m_themes[m_currentTheme];
+
+    if (!theme.contains(name))
+        return QPixmap();
+
+    const auto& states = theme[name];
+
+    if (states.contains(state))
+        return states[state];
+
+    // Fallback auf Normal
+    if (states.contains(ControlState::Normal))
+        return states[ControlState::Normal];
+
+    return QPixmap();
+}
+
+ThemeManager::WindowSkin ThemeManager::resolveWindowSkin(
+    const QString& texName, int wndW, int wndH) const
+{
+    WindowSkin ws;
+
+    if (texName.isEmpty())
+        return ws;
+
+    // 1) Prüfe TileSet
+    if (hasTileSet(texName))
+    {
+        ws = buildTileSet(texName);
+        if (ws.valid)
+            return ws;
+    }
+
+    // 2) Prüfe FullTexture
+    QPixmap pm = textureFor(texName);
+    if (matchesFullTexture(pm, wndW, wndH))
+    {
+        ws.tiles[0] = pm;
+        ws.valid = true;
+        ws.isTileset = false;
+        return ws;
+    }
+
+    // 3) Fallback (keine Erkennung)
+    return ws;
+}
+

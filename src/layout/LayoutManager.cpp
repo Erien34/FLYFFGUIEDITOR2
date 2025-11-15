@@ -70,7 +70,7 @@ void LayoutManager::refreshFromParser()
             //       4: width, 5: height, 6: flagsHex, 7: mod
             if (p.size() >= 8)
             {
-                win->texture   = p[1];
+                win->texture   = unquote(p[1]);
                 win->titletext = p[2];
                 win->modus     = p[3].toInt();
                 win->width     = p[4].toInt();

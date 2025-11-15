@@ -1,5 +1,6 @@
 #pragma once
 #include "WindowData.h"
+#include "RenderWindow.h"
 #include <QObject>
 #include <QPainter>
 
@@ -16,6 +17,7 @@ public:
     // Zeichnet den gesamten Canvas
     void render(QPainter* painter, const std::shared_ptr<WindowData>& wnd);
 
+
 signals:
     // Wird gesendet, wenn eine Neuzeichnung nötig ist
     void requestRepaint();
@@ -25,8 +27,10 @@ public slots:
     void refresh();
 
 private:
+
     ThemeManager* m_themeManager;
     BehaviorManager* m_behaviorManager;
     std::unique_ptr<RenderWindow> m_windowRenderer;
+
     //std::unique_ptr<RenderControl> m_controlRenderer;
 };

@@ -13,6 +13,11 @@ class ThemeManager : public QObject
 public:
     explicit ThemeManager(FileManager* fileMgr, QObject* parent = nullptr);
 
+struct WindowSkin {
+        QPixmap tiles[12];      // 00 .. 11
+        bool isTileset = false; // true = tile-based window
+        bool valid = false;
+};
     void refreshFromTokens(const QList<Token>& tokens);
 
     bool loadTheme(const QString& themeName);         // lädt (und cached) ein Theme
@@ -20,6 +25,7 @@ public:
     QString currentTheme() const { return m_currentTheme; }
 
     const QPixmap& texture(const QString& key, ControlState state = ControlState::Normal) const;
+    WindowSkin resolveWindowSkin(const QString& texName, int wndW, int wndH) const;
 
 signals:
     void texturesUpdated();
@@ -28,6 +34,12 @@ signals:
 private:
     void clear();
     QMap<ControlState, QPixmap> splitTextureStates(const QPixmap& src) const;
+
+    bool hasTileSet(const QString& baseName) const;
+    WindowSkin buildTileSet(const QString& baseName) const;
+    bool matchesFullTexture(const QPixmap& pm, int wndW, int wndH) const;
+
+    QPixmap textureFor(const QString& name, ControlState state = ControlState::Normal) const;
 
     FileManager* m_fileMgr = nullptr;
     QString m_currentTheme;

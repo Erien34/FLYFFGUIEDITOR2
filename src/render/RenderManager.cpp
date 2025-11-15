@@ -29,19 +29,14 @@ void RenderManager::render(QPainter* painter, const std::shared_ptr<WindowData>&
 
     painter->save();
 
-    // Hintergrund des Viewports (Editor)
-    QSize size(800, 600);
-    painter->fillRect(QRect(QPoint(0, 0), size), QColor(45, 45, 45));
+    // Hintergrund (Canvas)
+    painter->fillRect(QRect(0, 0, 800, 600), QColor(45, 45, 45));
     painter->setPen(Qt::gray);
-    painter->drawRect(QRect(QPoint(0, 0), size - QSize(1, 1)));
+    painter->drawRect(0, 0, 799, 599);
     painter->drawText(10, 20, "[RenderManager] aktiv");
 
     painter->restore();
 
-    // Fenster rendern
+    // Fenster vollständig durch RenderWindow rendern
     m_windowRenderer->render(painter, *wnd);
-
-    // Controls rendern (später)
-    // if (m_controlRenderer)
-    //     m_controlRenderer->render(painter, wnd->controls);
 }
