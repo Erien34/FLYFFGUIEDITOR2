@@ -3,8 +3,14 @@
 #include <QMap>
 #include <QList>
 #include <QString>
+#include <vector>
+#include <memory>
+
 #include "layout/model/TokenData.h"
 #include "utils/BaseManager.h"
+
+struct WindowData;
+struct ControlData;
 
 // ------------------------------------------------------------
 // Datenstruktur für Textgruppen
@@ -58,6 +64,8 @@ public:
     // Token-Integration
     // ------------------------------------------------------------
     void rebuildFromTokens(const QList<Token>& tokens);
+
+    void applyTextsToLayout(const std::vector<std::shared_ptr<WindowData>>& windows);
 
 private:
     // IDS → Text

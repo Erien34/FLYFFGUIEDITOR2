@@ -1,4 +1,7 @@
 #include "TextManager.h"
+#include "WindowData.h"
+#include "ControlData.h"
+
 #include <QRegularExpression>
 #include <QDebug>
 
@@ -163,4 +166,69 @@ QList<QString> TextManager::idsForGroup(const QString& tid) const
 QStringList TextManager::allGroups() const
 {
     return m_groups.keys();
+}
+
+void TextManager::applyTextsToLayout(const std::vector<std::shared_ptr<WindowData>>& windows)
+{
+    if (windows.empty()) {
+        qInfo() << "[TextManager] applyTextsToLayout(): keine Fenster übergeben.";
+        return;
+    }
+
+    qInfo() << "[TextManager] applyTextsToLayout(): Mapping startet. Fenster:" << windows.size();
+
+    for (const auto& wnd : windows)
+    {
+        if (!wnd)
+            continue;
+
+        //
+        // Fenster-Titel (WindowData::titletext enthält in FlyFF i.d.R. die Text-ID)
+        //
+        const QString titleId = wnd->titletext.trimmed();
+
+        if (!titleId.isEmpty())
+        {
+            const QString titleText = value(titleId);
+            if (!titleText.isEmpty()) {
+                wnd->behavior.attributes["titleId"]   = titleId;
+                wnd->behavior.attributes["titleText"] = titleText;
+            }
+        }
+
+        //
+        // Controls
+        //
+        for (const auto& ctrl : wnd->controls)
+        {
+            if (!ctrl)
+                continue;
+
+            // Control-Titel (LayoutManager setzt ctrl->titleId)
+            if (!ctrl->titleId.isEmpty())
+            {
+                const QString id = ctrl->titleId.trimmed();
+                const QString txt = value(id);
+
+                if (!txt.isEmpty()) {
+                    ctrl->behavior.attributes["titleId"]   = id;
+                    ctrl->behavior.attributes["titleText"] = txt;
+                }
+            }
+
+            // Tooltip
+            if (!ctrl->tooltipId.isEmpty())
+            {
+                const QString id = ctrl->tooltipId.trimmed();
+                const QString txt = value(id);
+
+                if (!txt.isEmpty()) {
+                    ctrl->behavior.attributes["tooltipId"]   = id;
+                    ctrl->behavior.attributes["tooltipText"] = txt;
+                }
+            }
+        }
+    }
+
+    qInfo() << "[TextManager] applyTextsToLayout(): Mapping abgeschlossen.";
 }

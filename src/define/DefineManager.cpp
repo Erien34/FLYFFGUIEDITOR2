@@ -1,6 +1,8 @@
 #include "DefineManager.h"
-#include "layout/model/TokenData.h"
-#include "model/WindowData.h"
+#include "TokenData.h"
+#include "WindowData.h"
+#include "ControlData.h"
+
 #include <QRegularExpression>
 #include <QDebug>
 
@@ -176,4 +178,74 @@ QList<Token> DefineManager::exportToTokens() const
     }
 
     return tokens;
+}
+
+void DefineManager::applyDefinesToLayout(const std::vector<std::shared_ptr<WindowData>>& windows)
+{
+    if (windows.empty()) {
+        qInfo() << "[DefineManager] applyDefinesToLayout(): keine Fenster übergeben.";
+        return;
+    }
+
+    if (m_all.isEmpty() && m_windowDefines.isEmpty() && m_controlDefines.isEmpty()) {
+        qInfo() << "[DefineManager] applyDefinesToLayout(): keine Defines geladen – überspringe.";
+        return;
+    }
+
+    qInfo() << "[DefineManager] applyDefinesToLayout(): Mapping startet. Fenster:" << windows.size();
+
+    for (const auto& wnd : windows)
+    {
+        if (!wnd)
+            continue;
+
+        const QString wndName = wnd->name;
+        if (wndName.isEmpty())
+            continue;
+
+        // Fenster-Define-Name wie in generateDefines()
+        const QString wndDefine = QStringLiteral("WND_%1").arg(wndName.toUpper());
+
+        quint32 wndId = 0;
+
+        if (m_windowDefines.contains(wndDefine))
+            wndId = m_windowDefines.value(wndDefine);
+        else if (m_all.contains(wndDefine))
+            wndId = m_all.value(wndDefine);
+
+        if (wndId != 0) {
+            wnd->behavior.attributes["defineName"] = wndDefine;
+            wnd->behavior.attributes["defineId"]   = wndId;
+        }
+
+        // Controls
+        for (const auto& ctrl : wnd->controls)
+        {
+            if (!ctrl)
+                continue;
+
+            const QString ctrlName = ctrl->id;
+            if (ctrlName.isEmpty())
+                continue;
+
+            // Control-Define-Name wie in generateDefines()
+            const QString ctrlDefine = QStringLiteral("WIDC_%1_%2")
+                                           .arg(wndName.toUpper())
+                                           .arg(ctrlName.toUpper());
+
+            quint32 ctrlId = 0;
+
+            if (m_controlDefines.contains(ctrlDefine))
+                ctrlId = m_controlDefines.value(ctrlDefine);
+            else if (m_all.contains(ctrlDefine))
+                ctrlId = m_all.value(ctrlDefine);
+
+            if (ctrlId != 0) {
+                ctrl->behavior.attributes["defineName"] = ctrlDefine;
+                ctrl->behavior.attributes["defineId"]   = ctrlId;
+            }
+        }
+    }
+
+    qInfo() << "[DefineManager] applyDefinesToLayout(): Mapping abgeschlossen.";
 }

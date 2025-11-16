@@ -127,7 +127,7 @@ bool RenderWindow::drawWindowTileset(QPainter& p, const QRect& area)
     QRect innerRect = area.adjusted(leftW,
                                     topH,
                                     -rightW,
-                                    -bottomH + 1);
+                                    -bottomH);
 
     if (!t07.isNull())
         p.drawTiledPixmap(innerRect, t07);
@@ -174,7 +174,7 @@ bool RenderWindow::drawWindowTileset(QPainter& p, const QRect& area)
     // Seiten (06,08)
     //
     const int sideTop    = headerY + (t04.isNull() ? 0 : t04.height());
-    const int sideBottom = area.bottom() - bottomH + 1;
+    const int sideBottom = area.bottom() - bottomH;
     const int sideHeight = qMax(0, sideBottom - sideTop + 1);
 
     if (!t06.isNull())

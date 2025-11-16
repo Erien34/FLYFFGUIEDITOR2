@@ -4,11 +4,13 @@
 #include <QString>
 #include <QList>
 #include <memory>
+#include <vector>
 
 #include "utils/BaseManager.h"
 #include "layout/model/TokenData.h"
 
 struct WindowData;
+struct ControlData;
 
 // ------------------------------------------------------------
 // DefineManager
@@ -38,6 +40,8 @@ public:
     const QMap<QString, quint32>& allDefines() const { return m_all; }
     const QMap<QString, quint32>& windowDefines() const { return m_windowDefines; }
     const QMap<QString, quint32>& controlDefines() const { return m_controlDefines; }
+
+    void applyDefinesToLayout(const std::vector<std::shared_ptr<WindowData>>& windows);
 
 private:
     QMap<QString, quint32> m_all;

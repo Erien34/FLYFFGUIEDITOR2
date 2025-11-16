@@ -451,11 +451,11 @@ void BehaviorManager::applyWindowStyle(WindowData& wnd) const
     //
     // 🧾 Debug-Ausgabe
     //
-    qDebug().noquote()
-        << QString("[BehaviorManager] applyWindowStyle → %1 (0x%2)")
-               .arg(wnd.name)
-               .arg(style, 0, 16)
-        << "\n → resolvedMask:" << wnd.resolvedMask;
+    // qDebug().noquote()
+    //     << QString("[BehaviorManager] applyWindowStyle → %1 (0x%2)")
+    //            .arg(wnd.name)
+    //            .arg(style, 0, 16)
+    //     << "\n → resolvedMask:" << wnd.resolvedMask;
 }
 // ---------------------------------------------------------
 // Validierung – aktuell sehr einfach, kann später ausgebaut werden
